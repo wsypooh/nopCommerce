@@ -4,6 +4,8 @@ using Nop.Core;
 using Nop.Core.Data;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Orders;
+using Nop.Services.Catalog;
+using Nop.Services.Directory;
 using Nop.Services.Events;
 using Nop.Services.Helpers;
 using Nop.Services.Localization;
@@ -22,6 +24,7 @@ namespace Nop.Services.Orders
         private readonly ILocalizationService _localizationService;
         private readonly IRepository<RewardPointsHistory> _rewardPointsHistoryRepository;
         private readonly RewardPointsSettings _rewardPointsSettings;
+        private readonly ShoppingCartSettings _shoppingCartSettings;
 
         #endregion
 
@@ -35,17 +38,20 @@ namespace Nop.Services.Orders
         /// <param name="localizationService">Localization service</param>
         /// <param name="rewardPointsHistoryRepository">Reward points history repository</param>
         /// <param name="rewardPointsSettings">Reward points settings</param>
+        /// <param name="shoppingCartSettings">Shopping cart settings</param>
         public RewardPointService(IDateTimeHelper dateTimeHelper,
             IEventPublisher eventPublisher,
             ILocalizationService localizationService,
             IRepository<RewardPointsHistory> rewardPointsHistoryRepository,
-            RewardPointsSettings rewardPointsSettings)
-        {
+            RewardPointsSettings rewardPointsSettings,
+            ShoppingCartSettings shoppingCartSettings)
+        { 
             this._dateTimeHelper = dateTimeHelper;
             this._eventPublisher = eventPublisher;
             this._localizationService = localizationService;
             this._rewardPointsHistoryRepository = rewardPointsHistoryRepository;
             this._rewardPointsSettings = rewardPointsSettings;
+            this._shoppingCartSettings = shoppingCartSettings;
         }
 
         #endregion
@@ -136,7 +142,7 @@ namespace Nop.Services.Orders
                 UpdateRewardPointsHistoryEntry(historyEntry);
             }
         }
-
+        
         #endregion
 
         #region Methods
@@ -173,6 +179,20 @@ namespace Nop.Services.Orders
 
             //return point balance of the first actual history entry
             return query.FirstOrDefault()?.PointsBalance ?? 0;
+        }
+
+        /// <summary>
+        /// Gets reduced reward points balance per order
+        /// </summary>
+        /// <param name="rewardPointsBalance">Reward points balance</param>
+        /// <returns>Reduced balance</returns>
+        public int GetReducedPointsBalance(int rewardPointsBalance)
+        {
+            if (_rewardPointsSettings.MaximumRewardPointsToUsePerOrder > 0 &&
+                rewardPointsBalance > _rewardPointsSettings.MaximumRewardPointsToUsePerOrder)
+                return _rewardPointsSettings.MaximumRewardPointsToUsePerOrder;
+
+            return rewardPointsBalance;
         }
 
         /// <summary>
