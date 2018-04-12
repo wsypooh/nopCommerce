@@ -494,6 +494,12 @@ set @resources='
   <LocaleResource Name="Admin.Configuration.Settings.Catalog.ExportImportRelatedEntitiesByName.Hint">
     <Value>Check if related entities should be exported/imported using name.</Value>
   </LocaleResource>    
+  <LocaleResource Name="Admin.Catalog.Products.Import.ManufacturersDontExist">
+    <Value>Manufacturers with the following names and/or IDs don''t exist: {0}</Value>
+  </LocaleResource>  
+  <LocaleResource Name="Admin.Catalog.Products.Import.CategoriesDontExist">
+    <Value>Categories with the following names and/or IDs don''t exist: {0}</Value>
+  </LocaleResource>    
 </Language>
 '
 

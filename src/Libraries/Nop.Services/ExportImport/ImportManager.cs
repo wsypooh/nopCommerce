@@ -175,6 +175,8 @@ namespace Nop.Services.ExportImport
                 if (SpecificationAttributeType.Option.ToSelectList(useLocalization: false)
                     .Any(p => p.Text.Equals(attributeType, StringComparison.InvariantCultureIgnoreCase)))
                     worksheet.Row(endRow).OutlineLevel = 1;
+                else if (int.TryParse(attributeType, out var attributeTypeId) && Enum.IsDefined(typeof(SpecificationAttributeType), attributeTypeId))
+                    worksheet.Row(endRow).OutlineLevel = 1;
             }
         }
 
@@ -788,17 +790,11 @@ namespace Nop.Services.ExportImport
                 new PropertyByName<ExportProductAttribute>("AttributeName"),
                 new PropertyByName<ExportProductAttribute>("AttributeTextPrompt"),
                 new PropertyByName<ExportProductAttribute>("AttributeIsRequired"),
-                new PropertyByName<ExportProductAttribute>("AttributeControlType")
-                {
-                    DropDownElements = AttributeControlType.TextBox.ToSelectList(useLocalization: false)
-                },
+                new PropertyByName<ExportProductAttribute>("AttributeControlType"),
                 new PropertyByName<ExportProductAttribute>("AttributeDisplayOrder"),
                 new PropertyByName<ExportProductAttribute>("ProductAttributeValueId"),
                 new PropertyByName<ExportProductAttribute>("ValueName"),
-                new PropertyByName<ExportProductAttribute>("AttributeValueType")
-                {
-                    DropDownElements = AttributeValueType.Simple.ToSelectList(useLocalization: false)
-                },
+                new PropertyByName<ExportProductAttribute>("AttributeValueType"),
                 new PropertyByName<ExportProductAttribute>("AssociatedProductId"),
                 new PropertyByName<ExportProductAttribute>("ColorSquaresRgb"),
                 new PropertyByName<ExportProductAttribute>("ImageSquaresPictureId"),
@@ -817,20 +813,10 @@ namespace Nop.Services.ExportImport
 
             var specificationAttributeProperties = new[]
             {
-                new PropertyByName<ExportSpecificationAttribute>("AttributeType", p => p.AttributeTypeId)
-                {
-                    DropDownElements = SpecificationAttributeType.Option.ToSelectList(useLocalization: false)
-                },
-                new PropertyByName<ExportSpecificationAttribute>("SpecificationAttribute",
-                    p => p.SpecificationAttributeId)
-                {
-                    DropDownElements = _specificationAttributeService.GetSpecificationAttributes()
-                        .Select(sa => sa as BaseEntity)
-                        .ToSelectList(p => (p as SpecificationAttribute)?.Name ?? string.Empty)
-                },
+                new PropertyByName<ExportSpecificationAttribute>("AttributeType", p => p.AttributeTypeId),
+                new PropertyByName<ExportSpecificationAttribute>("SpecificationAttribute", p => p.SpecificationAttributeId),
                 new PropertyByName<ExportSpecificationAttribute>("CustomValue", p => p.CustomValue),
-                new PropertyByName<ExportSpecificationAttribute>("SpecificationAttributeOptionId",
-                    p => p.SpecificationAttributeOptionId),
+                new PropertyByName<ExportSpecificationAttribute>("SpecificationAttributeOptionId", p => p.SpecificationAttributeOptionId),
                 new PropertyByName<ExportSpecificationAttribute>("AllowFiltering", p => p.AllowFiltering),
                 new PropertyByName<ExportSpecificationAttribute>("ShowOnProductPage", p => p.ShowOnProductPage),
                 new PropertyByName<ExportSpecificationAttribute>("DisplayOrder", p => p.DisplayOrder)
@@ -854,6 +840,15 @@ namespace Nop.Services.ExportImport
 
             if (_catalogSettings.ExportImportUseDropdownlistsForAssociatedEntities)
             {
+                productAttributeManager.SetSelectList("AttributeControlType", AttributeControlType.TextBox.ToSelectList(useLocalization: false));
+                productAttributeManager.SetSelectList("AttributeValueType", AttributeValueType.Simple.ToSelectList(useLocalization: false));
+
+                specificationAttributeManager.SetSelectList("AttributeType", SpecificationAttributeType.Option.ToSelectList(useLocalization: false));
+                specificationAttributeManager.SetSelectList("SpecificationAttribute", _specificationAttributeService
+                    .GetSpecificationAttributes()
+                    .Select(sa => sa as BaseEntity)
+                    .ToSelectList(p => (p as SpecificationAttribute)?.Name ?? string.Empty));
+
                 manager.SetSelectList("ProductType", ProductType.SimpleProduct.ToSelectList(useLocalization: false));
                 manager.SetSelectList("GiftCardType", GiftCardType.Virtual.ToSelectList(useLocalization: false));
                 manager.SetSelectList("DownloadActivationType",

@@ -195,7 +195,7 @@ namespace Nop.Services.ExportImport.Help
             if (string.IsNullOrEmpty(name?.ToString()))
                 return 0;
 
-            if (!int.TryParse(name.ToString(), out int id))
+            if (!int.TryParse(name.ToString(), out var id))
             {
                 id = 0;
             }
