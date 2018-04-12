@@ -909,7 +909,10 @@ set @resources='
     <Value>Maximum reward points to use per order</Value>
   </LocaleResource>
   <LocaleResource Name="Admin.Configuration.Settings.RewardPoints.MaximumRewardPointsToUsePerOrder.Hint">
-    <Value>Customers won''t be able to use reward points more then X of points per one order. Set to 0 if you do not want to use this setting.</Value>
+    <Value>Customers won''t be able to use reward points more than X of points per one order. Set to 0 if you do not want to use this setting.</Value>
+  </LocaleResource>  
+  <LocaleResource Name="Checkout.UseRewardPoints">
+    <Value>Use my reward points, {0} reward points ({1}) available for this order</Value>
   </LocaleResource>  
 </Language>
 '

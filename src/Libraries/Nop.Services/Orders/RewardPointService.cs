@@ -24,7 +24,6 @@ namespace Nop.Services.Orders
         private readonly ILocalizationService _localizationService;
         private readonly IRepository<RewardPointsHistory> _rewardPointsHistoryRepository;
         private readonly RewardPointsSettings _rewardPointsSettings;
-        private readonly ShoppingCartSettings _shoppingCartSettings;
 
         #endregion
 
@@ -38,20 +37,17 @@ namespace Nop.Services.Orders
         /// <param name="localizationService">Localization service</param>
         /// <param name="rewardPointsHistoryRepository">Reward points history repository</param>
         /// <param name="rewardPointsSettings">Reward points settings</param>
-        /// <param name="shoppingCartSettings">Shopping cart settings</param>
         public RewardPointService(IDateTimeHelper dateTimeHelper,
             IEventPublisher eventPublisher,
             ILocalizationService localizationService,
             IRepository<RewardPointsHistory> rewardPointsHistoryRepository,
-            RewardPointsSettings rewardPointsSettings,
-            ShoppingCartSettings shoppingCartSettings)
+            RewardPointsSettings rewardPointsSettings)
         { 
             this._dateTimeHelper = dateTimeHelper;
             this._eventPublisher = eventPublisher;
             this._localizationService = localizationService;
             this._rewardPointsHistoryRepository = rewardPointsHistoryRepository;
             this._rewardPointsSettings = rewardPointsSettings;
-            this._shoppingCartSettings = shoppingCartSettings;
         }
 
         #endregion
