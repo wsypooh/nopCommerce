@@ -288,7 +288,8 @@ namespace Nop.Web.Controllers
                     {
                         label = p.Name,
                         producturl = Url.RouteUrl("Product", new {SeName = p.SeName}),
-                        productpictureurl = p.DefaultPictureModel.ImageUrl
+                        productpictureurl = p.DefaultPictureModel.ImageUrl,
+                        productcount = products.TotalCount
                     })
                 .ToList();
             return Json(result);

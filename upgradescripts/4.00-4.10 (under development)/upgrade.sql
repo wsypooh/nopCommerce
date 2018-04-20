@@ -950,6 +950,9 @@ set @resources='
   <LocaleResource Name="Admin.Configuration.Payment">
     <Value></Value>
   </LocaleResource>
+  <LocaleResource Name="Search.SearchBox.SearchPageLink">
+    <Value>View all results...</Value>
+  </LocaleResource>
 </Language>
 '
 
