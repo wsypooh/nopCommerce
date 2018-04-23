@@ -20,7 +20,10 @@
     {
         <script asp-location="Footer">
             $(document).ready(function() {
+                //number of products found
                 var productCount;
+                //number of products displayed
+                var productNumber;
                 var searchText;
                 $('#small-searchterms').autocomplete({
                         delay: 500,
@@ -35,7 +38,7 @@
                     //append link to the end of list
                     open: function(event, ui) {
                         //display link to search page if product number greater than
-                        if (productCount > 10) {
+                        if (productCount > productNumber) {
                             searchText = document.getElementById("small-searchterms").value;
                             $(".ui-autocomplete").append("<li class=\"ui-menu-item\" role=\"presentation\"><a href=\"/search?q=" + searchText + "\">@T("Search.SearchBox.SearchPageLink")</a></li>");
                         }
@@ -44,6 +47,7 @@
                 .data("ui-autocomplete")._renderItem = function(ul, item) {
                     var t = item.label;
                     productCount = item.productcount;
+                    productNumber = item.productnumber;
                     //html encode
                     t = htmlEncode(t);
                     return $("<li></li>")
