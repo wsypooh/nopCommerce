@@ -1582,6 +1582,7 @@ INSERT [dbo].[Setting] ([Id], [Name], [Value], [StoreId]) VALUES (154, N'catalog
 INSERT [dbo].[Setting] ([Id], [Name], [Value], [StoreId]) VALUES (155, N'catalogsettings.compareproductsnumber', N'4', 0)
 INSERT [dbo].[Setting] ([Id], [Name], [Value], [StoreId]) VALUES (156, N'catalogsettings.productsearchautocompleteenabled', N'True', 0)
 INSERT [dbo].[Setting] ([Id], [Name], [Value], [StoreId]) VALUES (157, N'catalogsettings.productsearchautocompletenumberofproducts', N'10', 0)
+INSERT [dbo].[Setting] ([Id], [Name], [Value], [StoreId]) VALUES (158, N'catalogsettings.showlinktoallresultinsearchautocomplete', N'False', 0)
 INSERT [dbo].[Setting] ([Id], [Name], [Value], [StoreId]) VALUES (158, N'catalogsettings.showproductimagesinsearchautocomplete', N'False', 0)
 INSERT [dbo].[Setting] ([Id], [Name], [Value], [StoreId]) VALUES (159, N'catalogsettings.productsearchtermminimumlength', N'3', 0)
 INSERT [dbo].[Setting] ([Id], [Name], [Value], [StoreId]) VALUES (160, N'catalogsettings.showbestsellersonhomepage', N'False', 0)

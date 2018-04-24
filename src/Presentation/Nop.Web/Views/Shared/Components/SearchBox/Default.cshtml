@@ -19,11 +19,8 @@
     @if (Model.AutoCompleteEnabled)
     {
         <script asp-location="Footer">
-            $(document).ready(function() {
-                //number of products found
-                var productCount;
-                //number of products displayed
-                var productNumber;
+            $(document).ready(function() {                
+                var showLinkToResultSearch;
                 var searchText;
                 $('#small-searchterms').autocomplete({
                         delay: 500,
@@ -37,17 +34,16 @@
                     },
                     //append link to the end of list
                     open: function(event, ui) {
-                        //display link to search page if product number greater than
-                        if (productCount > productNumber) {
+                        //display link to search page
+                        if (showLinkToResultSearch) {
                             searchText = document.getElementById("small-searchterms").value;
                             $(".ui-autocomplete").append("<li class=\"ui-menu-item\" role=\"presentation\"><a href=\"/search?q=" + searchText + "\">@T("Search.SearchBox.SearchPageLink")</a></li>");
                         }
                     }
                 })
                 .data("ui-autocomplete")._renderItem = function(ul, item) {
-                    var t = item.label;
-                    productCount = item.productcount;
-                    productNumber = item.productnumber;
+                    var t = item.label;                    
+                    showLinkToResultSearch = item.showlinktoresultsearch;
                     //html encode
                     t = htmlEncode(t);
                     return $("<li></li>")
