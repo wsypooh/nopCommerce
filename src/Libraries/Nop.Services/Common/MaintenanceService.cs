@@ -208,7 +208,33 @@ namespace Nop.Services.Common
         {
             return Path.Combine(GetBackupDirectoryPath(), backupFileName);
         }
-        
+
+        /// <summary>
+        /// Re-indexing database tables
+        /// </summary>
+        public virtual void ReIndexingTables()
+        {
+            var commandText = $@"
+                BEGIN 
+                    DECLARE @TableName sysname 
+                    DECLARE cur_reindex CURSOR FOR
+                    SELECT table_name
+                    FROM [{_dbContext.DbName()}].information_schema.tables
+                    WHERE table_type = 'base table'
+                    OPEN cur_reindex
+                    FETCH NEXT FROM cur_reindex INTO @TableName
+                    WHILE @@FETCH_STATUS = 0
+                        BEGIN
+		                    exec('ALTER INDEX ALL ON [' + @TableName + '] REBUILD WITH (FILLFACTOR = 80, SORT_IN_TEMPDB = ON, STATISTICS_NORECOMPUTE = ON)')
+                            FETCH NEXT FROM cur_reindex INTO @TableName
+                        END
+                    CLOSE cur_reindex
+                    DEALLOCATE cur_reindex
+                END";
+
+            _dbContext.ExecuteSqlCommand(commandText, true);
+        }
+
         #endregion
     }
 }

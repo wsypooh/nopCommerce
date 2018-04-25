@@ -950,6 +950,21 @@ set @resources='
   <LocaleResource Name="Admin.Configuration.Payment">
     <Value></Value>
   </LocaleResource>
+  <LocaleResource Name="Admin.System.Maintenance.ReIndexTables">
+    <Value>Re-indexing database tables</Value>
+  </LocaleResource>
+  <LocaleResource Name="Admin.System.Maintenance.ReIndexTables.Complete">
+    <Value>Re-indexing database tables complete</Value>
+  </LocaleResource>
+  <LocaleResource Name="Admin.System.Maintenance.ReIndexTables.Lable">
+    <Value>Modifies an existing tables by rebuilding the index. When you execute re-indexing on a table, only the statistics associates with indexes are updated. Automatic or manual statistics created on the table (instead of an index) are not updated.</Value>
+  </LocaleResource>
+  <LocaleResource Name="Admin.System.Maintenance.ReIndexTables.Progress">
+    <Value>Processing re-indexing...</Value>
+  </LocaleResource>  
+  <LocaleResource Name="Admin.System.Maintenance.ReIndexTables.ReIndexNow">
+    <Value>Re-index</Value>
+  </LocaleResource>
 </Language>
 '
 

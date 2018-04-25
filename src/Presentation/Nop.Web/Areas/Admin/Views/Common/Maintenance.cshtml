@@ -158,6 +158,30 @@
                                     </div>
                                 </div>
                             </div>
+                            <div class="col-md-4">
+                                <div class="panel panel-default" style="min-height: 230px;">
+                                    <div class="panel-heading">
+                                        @T("Admin.System.Maintenance.ReIndexTables")
+                                    </div>
+                                    <div class="panel-body">
+                                        <div class="form-group">
+                                            <div class="col-md-12">
+                                                <div>
+                                                    <p>
+                                                        @T("Admin.System.Maintenance.ReIndexTables.Lable")
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <button type="submit" name="re-index" class="btn btn-default">
+                                                        <i class="fa fa-gears"></i>
+                                                        @T("Admin.System.Maintenance.ReIndexTables.ReIndexNow")
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>                                        
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -189,9 +213,18 @@
                         showThrobber('@Html.Raw(JavaScriptEncoder.Default.Encode(T("Admin.System.Maintenance.BackupDatabase.Progress").Text))');
                     };
 
+                    function showProgressReIndex() {
+                        $("html, body").animate({ scrollTop: 0 }, 400);
+                        showThrobber('@Html.Raw(JavaScriptEncoder.Default.Encode(T("Admin.System.Maintenance.ReIndexTables.Progress").Text))');
+                    };
+
                     $(document).ready(function () {
                         $("#backup-database").on("click", function () {
                             showProgress();
+                        });
+
+                        $("#re-index").on("click", function () {
+                            showProgressReIndex();
                         });
                     });
                 </script>
