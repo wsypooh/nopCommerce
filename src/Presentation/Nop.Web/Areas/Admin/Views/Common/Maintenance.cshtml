@@ -201,6 +201,15 @@
                 <div id="backup-data" style="display: none"></div>
 
                 <script>
+                    $(document).ready(function() {
+                        $("button[name='re-index']").on("click", function () {
+                            $("html, body").animate({ scrollTop: 0 }, 400);
+                            showThrobber('@Html.Raw(JavaScriptEncoder.Default.Encode(T("Admin.System.Maintenance.ReIndexTables.Progress").Text))');
+                        });
+                    });
+                </script>
+
+                <script>
                     function submitBackupAction(fileName, action) {
                         $("#backup-data").children().remove();
                         $("#backup-data").append('<input type="hidden" name="backupFileName" value="' + fileName + '"/>');
@@ -212,19 +221,10 @@
                         $("html, body").animate({ scrollTop: 0 }, 400);
                         showThrobber('@Html.Raw(JavaScriptEncoder.Default.Encode(T("Admin.System.Maintenance.BackupDatabase.Progress").Text))');
                     };
-
-                    function showProgressReIndex() {
-                        $("html, body").animate({ scrollTop: 0 }, 400);
-                        showThrobber('@Html.Raw(JavaScriptEncoder.Default.Encode(T("Admin.System.Maintenance.ReIndexTables.Progress").Text))');
-                    };
-
+                    
                     $(document).ready(function () {
                         $("#backup-database").on("click", function () {
                             showProgress();
-                        });
-
-                        $("#re-index").on("click", function () {
-                            showProgressReIndex();
                         });
                     });
                 </script>
