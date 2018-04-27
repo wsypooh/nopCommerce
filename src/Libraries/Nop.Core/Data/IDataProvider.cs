@@ -33,6 +33,11 @@ namespace Nop.Core.Data
         bool BackupSupported { get; }
 
         /// <summary>
+        /// A value indicating whether this data provider supports re-index
+        /// </summary>
+        bool ReIndexSupported { get; }
+
+        /// <summary>
         /// Gets a support database parameter object (used by stored procedures)
         /// </summary>
         /// <returns>Parameter</returns>

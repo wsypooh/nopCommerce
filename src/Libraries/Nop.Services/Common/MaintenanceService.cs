@@ -71,9 +71,19 @@ namespace Nop.Services.Common
 
             throw new DataException("This database does not support backup");
         }
-        
+
+        /// <summary>
+        /// Check whether re-index are supported
+        /// </summary>
+        protected virtual void CheckReIndexSupported()
+        {
+            if (_dataProvider.ReIndexSupported) return;
+
+            throw new DataException("This database does not support re-index");
+        }
+
         #endregion
-        
+
         #region Methods
 
         /// <summary>
@@ -214,8 +224,8 @@ namespace Nop.Services.Common
         /// </summary>
         public virtual void ReIndexingTables()
         {
+            CheckReIndexSupported();
             var commandText = $@"
-                BEGIN 
                     DECLARE @TableName sysname 
                     DECLARE cur_reindex CURSOR FOR
                     SELECT table_name
@@ -225,12 +235,11 @@ namespace Nop.Services.Common
                     FETCH NEXT FROM cur_reindex INTO @TableName
                     WHILE @@FETCH_STATUS = 0
                         BEGIN
-		                    exec('ALTER INDEX ALL ON [' + @TableName + '] REBUILD WITH (FILLFACTOR = 80, SORT_IN_TEMPDB = ON, STATISTICS_NORECOMPUTE = ON)')
+		                    exec('ALTER INDEX ALL ON [' + @TableName + '] REBUILD')
                             FETCH NEXT FROM cur_reindex INTO @TableName
                         END
                     CLOSE cur_reindex
-                    DEALLOCATE cur_reindex
-                END";
+                    DEALLOCATE cur_reindex";
 
             _dbContext.ExecuteSqlCommand(commandText, true);
         }

@@ -137,6 +137,14 @@ namespace Nop.Data
         }
 
         /// <summary>
+        /// A value indicating whether this data provider supports re-index
+        /// </summary>
+        public virtual bool ReIndexSupported
+        {
+            get { return true; }
+        }
+
+        /// <summary>
         /// Gets a support database parameter object (used by stored procedures)
         /// </summary>
         /// <returns>Parameter</returns>
