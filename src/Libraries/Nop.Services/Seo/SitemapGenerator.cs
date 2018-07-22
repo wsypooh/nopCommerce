@@ -25,84 +25,59 @@ namespace Nop.Services.Seo
     /// </summary>
     public partial class SitemapGenerator : ISitemapGenerator
     {
-        #region Constants
-
-        private const string DATE_FORMAT = @"yyyy-MM-dd";
-
-        /// <summary>
-        /// At now each provided sitemap file must have no more than 50000 URLs
-        /// </summary>
-        private const int MAX_SITEMAP_URL_NUMBER = 50000;
-
-        #endregion
-
         #region Fields
 
-        private readonly IStoreContext _storeContext;
-        private readonly ICategoryService _categoryService;
-        private readonly IProductService _productService;
-        private readonly IManufacturerService _manufacturerService;
-        private readonly ITopicService _topicService;
-        private readonly IWebHelper _webHelper;
-        private readonly IUrlHelperFactory _urlHelperFactory;
-        private readonly IActionContextAccessor _actionContextAccessor;
-        private readonly CommonSettings _commonSettings;
         private readonly BlogSettings _blogSettings;
-        private readonly NewsSettings _newsSettings;
+        private readonly CommonSettings _commonSettings;
         private readonly ForumSettings _forumSettings;
-        private readonly SecuritySettings _securitySettings;
+        private readonly IActionContextAccessor _actionContextAccessor;
+        private readonly ICategoryService _categoryService;
+        private readonly IManufacturerService _manufacturerService;
+        private readonly IProductService _productService;
         private readonly IProductTagService _productTagService;
+        private readonly IStoreContext _storeContext;
+        private readonly ITopicService _topicService;
+        private readonly IUrlHelperFactory _urlHelperFactory;
+        private readonly IUrlRecordService _urlRecordService;
+        private readonly IWebHelper _webHelper;
+        private readonly NewsSettings _newsSettings;
+        private readonly SecuritySettings _securitySettings;
 
         #endregion
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="storeContext">Store context</param>
-        /// <param name="categoryService">Category service</param>
-        /// <param name="productService">Product service</param>
-        /// <param name="manufacturerService">Manufacturer service</param>
-        /// <param name="topicService">Topic service</param>
-        /// <param name="webHelper">Web helper</param>
-        /// <param name="urlHelperFactory">URL g=helper factory</param>
-        /// <param name="actionContextAccessor">Action context accessor</param>
-        /// <param name="commonSettings">Common settings</param>
-        /// <param name="blogSettings">Blog settings</param>
-        /// <param name="newsSettings">News settings</param>
-        /// <param name="forumSettings">Forum settings</param>
-        /// <param name="securitySettings">Security settings</param>
-        /// <param name="productTagService">Product tag service</param>
-        public SitemapGenerator(IStoreContext storeContext,
-            ICategoryService categoryService,
-            IProductService productService,
-            IManufacturerService manufacturerService,
-            ITopicService topicService,
-            IWebHelper webHelper,
-            IUrlHelperFactory urlHelperFactory,
-            IActionContextAccessor actionContextAccessor,
+        public SitemapGenerator(BlogSettings blogSettings,
             CommonSettings commonSettings,
-            BlogSettings blogSettings,
-            NewsSettings newsSettings,
             ForumSettings forumSettings,
-            SecuritySettings securitySettings,
-            IProductTagService productTagService)
+            IActionContextAccessor actionContextAccessor,
+            ICategoryService categoryService,
+            IManufacturerService manufacturerService,
+            IProductService productService,
+            IProductTagService productTagService,
+            IStoreContext storeContext,
+            ITopicService topicService,
+            IUrlHelperFactory urlHelperFactory,
+            IUrlRecordService urlRecordService,
+            IWebHelper webHelper,
+            NewsSettings newsSettings,
+            SecuritySettings securitySettings)
         {
-            this._storeContext = storeContext;
-            this._categoryService = categoryService;
-            this._productService = productService;
-            this._manufacturerService = manufacturerService;
-            this._topicService = topicService;
-            this._webHelper = webHelper;
-            this._urlHelperFactory = urlHelperFactory;
-            this._actionContextAccessor = actionContextAccessor;
-            this._commonSettings = commonSettings;
             this._blogSettings = blogSettings;
-            this._newsSettings = newsSettings;
+            this._commonSettings = commonSettings;
             this._forumSettings = forumSettings;
-            this._securitySettings = securitySettings;
+            this._actionContextAccessor = actionContextAccessor;
+            this._categoryService = categoryService;
+            this._manufacturerService = manufacturerService;
+            this._productService = productService;
             this._productTagService = productTagService;
+            this._storeContext = storeContext;
+            this._topicService = topicService;
+            this._urlHelperFactory = urlHelperFactory;
+            this._urlRecordService = urlRecordService;
+            this._webHelper = webHelper;
+            this._newsSettings = newsSettings;
+            this._securitySettings = securitySettings;
         }
 
         #endregion
@@ -162,7 +137,7 @@ namespace Nop.Services.Seo
         /// <returns>Protocol name as string</returns>
         protected virtual string GetHttpProtocol()
         {
-            return _securitySettings.ForceSslForAllPages ? "https" : "http";
+            return _securitySettings.ForceSslForAllPages ? Uri.UriSchemeHttps : Uri.UriSchemeHttp;
         }
 
         /// <summary>
@@ -241,7 +216,7 @@ namespace Nop.Services.Seo
             var urlHelper = GetUrlHelper();
             return _categoryService.GetAllCategories().Select(category =>
             {
-                var url = urlHelper.RouteUrl("Category", new { SeName = category.GetSeName() }, GetHttpProtocol());
+                var url = urlHelper.RouteUrl("Category", new { SeName = _urlRecordService.GetSeName(category) }, GetHttpProtocol());
                 return new SitemapUrl(url, UpdateFrequency.Weekly, category.UpdatedOnUtc);
             });
         }
@@ -255,7 +230,7 @@ namespace Nop.Services.Seo
             var urlHelper = GetUrlHelper();
             return _manufacturerService.GetAllManufacturers(storeId: _storeContext.CurrentStore.Id).Select(manufacturer =>
             {
-                var url = urlHelper.RouteUrl("Manufacturer", new { SeName = manufacturer.GetSeName() }, GetHttpProtocol());
+                var url = urlHelper.RouteUrl("Manufacturer", new { SeName = _urlRecordService.GetSeName(manufacturer) }, GetHttpProtocol());
                 return new SitemapUrl(url, UpdateFrequency.Weekly, manufacturer.UpdatedOnUtc);
             });
         }
@@ -269,10 +244,10 @@ namespace Nop.Services.Seo
             var urlHelper = GetUrlHelper();
             return _productService.SearchProducts(storeId: _storeContext.CurrentStore.Id,
                 visibleIndividuallyOnly: true, orderBy: ProductSortingEnum.CreatedOn).Select(product =>
-            { 
-                var url = urlHelper.RouteUrl("Product", new { SeName = product.GetSeName() }, GetHttpProtocol());
-                return new SitemapUrl(url, UpdateFrequency.Weekly, product.UpdatedOnUtc);
-            });
+                {
+                    var url = urlHelper.RouteUrl("Product", new { SeName = _urlRecordService.GetSeName(product) }, GetHttpProtocol());
+                    return new SitemapUrl(url, UpdateFrequency.Weekly, product.UpdatedOnUtc);
+                });
         }
 
         /// <summary>
@@ -284,7 +259,7 @@ namespace Nop.Services.Seo
             var urlHelper = GetUrlHelper();
             return _productTagService.GetAllProductTags().Select(productTag =>
             {
-                var url = urlHelper.RouteUrl("ProductsByTag", new { SeName = productTag.GetSeName() }, GetHttpProtocol());
+                var url = urlHelper.RouteUrl("ProductsByTag", new { SeName = _urlRecordService.GetSeName(productTag) }, GetHttpProtocol());
                 return new SitemapUrl(url, UpdateFrequency.Weekly, DateTime.UtcNow);
             });
         }
@@ -298,7 +273,7 @@ namespace Nop.Services.Seo
             var urlHelper = GetUrlHelper();
             return _topicService.GetAllTopics(_storeContext.CurrentStore.Id).Where(t => t.IncludeInSitemap).Select(topic =>
             {
-                var url = urlHelper.RouteUrl("Topic", new { SeName = topic.GetSeName() }, GetHttpProtocol());
+                var url = urlHelper.RouteUrl("Topic", new { SeName = _urlRecordService.GetSeName(topic) }, GetHttpProtocol());
                 return new SitemapUrl(url, UpdateFrequency.Weekly, DateTime.UtcNow);
             });
         }
@@ -311,7 +286,7 @@ namespace Nop.Services.Seo
         {
             var storeLocation = _webHelper.GetStoreLocation();
 
-            return _commonSettings.SitemapCustomUrls.Select(customUrl => 
+            return _commonSettings.SitemapCustomUrls.Select(customUrl =>
                 new SitemapUrl(string.Concat(storeLocation, customUrl), UpdateFrequency.Weekly, DateTime.UtcNow));
         }
 
@@ -340,7 +315,7 @@ namespace Nop.Services.Seo
 
                     writer.WriteStartElement("sitemap");
                     writer.WriteElementString("loc", location);
-                    writer.WriteElementString("lastmod", DateTime.UtcNow.ToString(DATE_FORMAT));
+                    writer.WriteElementString("lastmod", DateTime.UtcNow.ToString(NopSeoDefaults.SitemapDateFormat));
                     writer.WriteEndElement();
                 }
 
@@ -372,7 +347,7 @@ namespace Nop.Services.Seo
 
                     writer.WriteElementString("loc", location);
                     writer.WriteElementString("changefreq", url.UpdateFrequency.ToString().ToLowerInvariant());
-                    writer.WriteElementString("lastmod", url.UpdatedOn.ToString(DATE_FORMAT, CultureInfo.InvariantCulture));
+                    writer.WriteElementString("lastmod", url.UpdatedOn.ToString(NopSeoDefaults.SitemapDateFormat, CultureInfo.InvariantCulture));
                     writer.WriteEndElement();
                 }
 
@@ -412,7 +387,8 @@ namespace Nop.Services.Seo
 
             //split URLs into separate lists based on the max size 
             var sitemaps = sitemapUrls.Select((url, index) => new { Index = index, Value = url })
-                .GroupBy(group => group.Index / MAX_SITEMAP_URL_NUMBER).Select(group => group.Select(url => url.Value).ToList()).ToList();
+                .GroupBy(group => group.Index / NopSeoDefaults.SitemapMaxUrlNumber)
+                    .Select(group => group.Select(url => url.Value).ToList()).ToList();
 
             if (!sitemaps.Any())
                 return;
@@ -425,12 +401,12 @@ namespace Nop.Services.Seo
 
                 //otherwise write a certain numbered sitemap file into the stream
                 WriteSitemap(stream, sitemaps.ElementAt(id.Value - 1));
-                
+
             }
             else
             {
                 //URLs more than the maximum allowable, so generate a sitemap index file
-                if (sitemapUrls.Count >= MAX_SITEMAP_URL_NUMBER)
+                if (sitemapUrls.Count >= NopSeoDefaults.SitemapMaxUrlNumber)
                 {
                     //write a sitemap index file into the stream
                     WriteSitemapIndex(stream, sitemaps.Count);

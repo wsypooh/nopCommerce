@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
 using Nop.Core.Domain.Catalog;
+using Nop.Core.Http;
 
 namespace Nop.Services.Catalog
 {
@@ -11,15 +12,6 @@ namespace Nop.Services.Catalog
     /// </summary>
     public partial class RecentlyViewedProductsService : IRecentlyViewedProductsService
     {
-        #region Constants
-
-        /// <summary>
-        /// Recently viewed products cookie name
-        /// </summary>
-        private const string RECENTLY_VIEWED_PRODUCTS_COOKIE_NAME = ".Nop.RecentlyViewedProducts";
-
-        #endregion
-
         #region Fields
 
         private readonly CatalogSettings _catalogSettings;
@@ -30,12 +22,6 @@ namespace Nop.Services.Catalog
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="catalogSettings">Catalog settings</param>
-        /// <param name="httpContextAccessor">HTTP context accessor</param>
-        /// <param name="productService">Product service</param>
         public RecentlyViewedProductsService(CatalogSettings catalogSettings,
             IHttpContextAccessor httpContextAccessor,
             IProductService productService)
@@ -70,7 +56,8 @@ namespace Nop.Services.Catalog
                 return new List<int>();
 
             //try to get cookie
-            if (!httpContext.Request.Cookies.TryGetValue(RECENTLY_VIEWED_PRODUCTS_COOKIE_NAME, out string productIdsCookie) || string.IsNullOrEmpty(productIdsCookie))
+            var cookieName = $"{NopCookieDefaults.Prefix}{NopCookieDefaults.RecentlyViewedProductsCookie}";
+            if (!httpContext.Request.Cookies.TryGetValue(cookieName, out string productIdsCookie) || string.IsNullOrEmpty(productIdsCookie))
                 return new List<int>();
 
             //get array of string product identifiers from cookie
@@ -87,7 +74,8 @@ namespace Nop.Services.Catalog
         protected virtual void AddRecentlyViewedProductsCookie(IEnumerable<int> recentlyViewedProductIds)
         {
             //delete current cookie if exists
-            _httpContextAccessor.HttpContext.Response.Cookies.Delete(RECENTLY_VIEWED_PRODUCTS_COOKIE_NAME);
+            var cookieName = $"{NopCookieDefaults.Prefix}{NopCookieDefaults.RecentlyViewedProductsCookie}";
+            _httpContextAccessor.HttpContext.Response.Cookies.Delete(cookieName);
 
             //create cookie value
             var productIdsCookie = string.Join(",", recentlyViewedProductIds);
@@ -101,7 +89,7 @@ namespace Nop.Services.Catalog
             };
 
             //add cookie
-            _httpContextAccessor.HttpContext.Response.Cookies.Append(RECENTLY_VIEWED_PRODUCTS_COOKIE_NAME, productIdsCookie, cookieOptions);
+            _httpContextAccessor.HttpContext.Response.Cookies.Append(cookieName, productIdsCookie, cookieOptions);
         }
 
         #endregion

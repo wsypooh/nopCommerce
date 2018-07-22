@@ -7,7 +7,7 @@ using Nop.Services.Catalog;
 using Nop.Services.Discounts;
 using Nop.Services.Localization;
 using Nop.Services.Seo;
-using Nop.Web.Areas.Admin.Extensions;
+using Nop.Web.Areas.Admin.Infrastructure.Mapper.Extensions;
 using Nop.Web.Areas.Admin.Models.Catalog;
 using Nop.Web.Framework.Factories;
 
@@ -30,6 +30,7 @@ namespace Nop.Web.Areas.Admin.Factories
         private readonly ILocalizedModelFactory _localizedModelFactory;
         private readonly IProductService _productService;
         private readonly IStoreMappingSupportedModelFactory _storeMappingSupportedModelFactory;
+        private readonly IUrlRecordService _urlRecordService;
 
         #endregion
 
@@ -44,7 +45,8 @@ namespace Nop.Web.Areas.Admin.Factories
             ILocalizationService localizationService,
             ILocalizedModelFactory localizedModelFactory,
             IProductService productService,
-            IStoreMappingSupportedModelFactory storeMappingSupportedModelFactory)
+            IStoreMappingSupportedModelFactory storeMappingSupportedModelFactory,
+            IUrlRecordService urlRecordService)
         {
             this._catalogSettings = catalogSettings;
             this._aclSupportedModelFactory = aclSupportedModelFactory;
@@ -56,6 +58,7 @@ namespace Nop.Web.Areas.Admin.Factories
             this._localizedModelFactory = localizedModelFactory;
             this._productService = productService;
             this._storeMappingSupportedModelFactory = storeMappingSupportedModelFactory;
+            this._urlRecordService = urlRecordService;
         }
 
         #endregion
@@ -116,7 +119,7 @@ namespace Nop.Web.Areas.Admin.Factories
         {
             if (searchModel == null)
                 throw new ArgumentNullException(nameof(searchModel));
-            
+
             //get categories
             var categories = _categoryService.GetAllCategories(categoryName: searchModel.SearchCategoryName,
                 showHidden: true,
@@ -129,10 +132,10 @@ namespace Nop.Web.Areas.Admin.Factories
                 Data = categories.Select(category =>
                 {
                     //fill in model values from the entity
-                    var categoryModel = category.ToModel();
+                    var categoryModel = category.ToModel<CategoryModel>();
 
                     //fill in additional values (not existing in the entity)
-                    categoryModel.Breadcrumb = category.GetFormattedBreadCrumb(_categoryService);
+                    categoryModel.Breadcrumb = _categoryService.GetFormattedBreadCrumb(category);
 
                     return categoryModel;
                 }),
@@ -156,7 +159,7 @@ namespace Nop.Web.Areas.Admin.Factories
             if (category != null)
             {
                 //fill in model values from the entity
-                model = model ?? category.ToModel();
+                model = model ?? category.ToModel<CategoryModel>();
 
                 //prepare nested search model
                 PrepareCategoryProductSearchModel(model.CategoryProductSearchModel, category);
@@ -164,12 +167,12 @@ namespace Nop.Web.Areas.Admin.Factories
                 //define localized model configuration action
                 localizedModelConfiguration = (locale, languageId) =>
                 {
-                    locale.Name = category.GetLocalized(entity => entity.Name, languageId, false, false);
-                    locale.Description = category.GetLocalized(entity => entity.Description, languageId, false, false);
-                    locale.MetaKeywords = category.GetLocalized(entity => entity.MetaKeywords, languageId, false, false);
-                    locale.MetaDescription = category.GetLocalized(entity => entity.MetaDescription, languageId, false, false);
-                    locale.MetaTitle = category.GetLocalized(entity => entity.MetaTitle, languageId, false, false);
-                    locale.SeName = category.GetSeName(languageId, false, false);
+                    locale.Name = _localizationService.GetLocalized(category, entity => entity.Name, languageId, false, false);
+                    locale.Description = _localizationService.GetLocalized(category, entity => entity.Description, languageId, false, false);
+                    locale.MetaKeywords = _localizationService.GetLocalized(category, entity => entity.MetaKeywords, languageId, false, false);
+                    locale.MetaDescription = _localizationService.GetLocalized(category, entity => entity.MetaDescription, languageId, false, false);
+                    locale.MetaTitle = _localizationService.GetLocalized(category, entity => entity.MetaTitle, languageId, false, false);
+                    locale.SeName = _urlRecordService.GetSeName(category, languageId, false, false);
                 };
             }
 
@@ -285,7 +288,7 @@ namespace Nop.Web.Areas.Admin.Factories
         {
             if (searchModel == null)
                 throw new ArgumentNullException(nameof(searchModel));
-            
+
             //get products
             var products = _productService.SearchProducts(showHidden: true,
                 categoryIds: new List<int> { searchModel.SearchCategoryId },
@@ -300,7 +303,7 @@ namespace Nop.Web.Areas.Admin.Factories
             var model = new AddProductToCategoryListModel
             {
                 //fill in model values from the entity
-                Data = products.Select(product => product.ToModel()),
+                Data = products.Select(product => product.ToModel<ProductModel>()),
                 Total = products.TotalCount
             };
 

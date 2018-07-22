@@ -15,6 +15,7 @@ using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Discounts;
 using Nop.Core.Domain.Forums;
+using Nop.Core.Domain.Gdpr;
 using Nop.Core.Domain.Localization;
 using Nop.Core.Domain.Logging;
 using Nop.Core.Domain.Media;
@@ -32,6 +33,7 @@ using Nop.Core.Domain.Tax;
 using Nop.Core.Domain.Topics;
 using Nop.Core.Domain.Vendors;
 using Nop.Core.Infrastructure;
+using Nop.Data.Extensions;
 using Nop.Services.Common;
 using Nop.Services.Configuration;
 using Nop.Services.Customers;
@@ -49,192 +51,229 @@ namespace Nop.Services.Installation
     {
         #region Fields
 
-        private readonly IRepository<Store> _storeRepository;
-        private readonly IRepository<MeasureDimension> _measureDimensionRepository;
-        private readonly IRepository<MeasureWeight> _measureWeightRepository;
-        private readonly IRepository<TaxCategory> _taxCategoryRepository;
-        private readonly IRepository<Language> _languageRepository;
+        private readonly IGenericAttributeService _genericAttributeService;
+        private readonly IHostingEnvironment _hostingEnvironment;
+        private readonly INopFileProvider _fileProvider;
+        private readonly IRepository<ActivityLog> _activityLogRepository;
+        private readonly IRepository<ActivityLogType> _activityLogTypeRepository;
+        private readonly IRepository<Address> _addressRepository;
+        private readonly IRepository<Affiliate> _affiliateRepository;
+        private readonly IRepository<BlogPost> _blogPostRepository;
+        private readonly IRepository<Category> _categoryRepository;
+        private readonly IRepository<CategoryTemplate> _categoryTemplateRepository;
+        private readonly IRepository<CheckoutAttribute> _checkoutAttributeRepository;
+        private readonly IRepository<Country> _countryRepository;
         private readonly IRepository<Currency> _currencyRepository;
         private readonly IRepository<Customer> _customerRepository;
         private readonly IRepository<CustomerPassword> _customerPasswordRepository;
         private readonly IRepository<CustomerRole> _customerRoleRepository;
-        private readonly IRepository<SpecificationAttribute> _specificationAttributeRepository;
-        private readonly IRepository<CheckoutAttribute> _checkoutAttributeRepository;
-        private readonly IRepository<ProductAttribute> _productAttributeRepository;
-        private readonly IRepository<Category> _categoryRepository;
-        private readonly IRepository<Manufacturer> _manufacturerRepository;
-        private readonly IRepository<Product> _productRepository;
-        private readonly IRepository<UrlRecord> _urlRecordRepository;
-        private readonly IRepository<RelatedProduct> _relatedProductRepository;
-        private readonly IRepository<EmailAccount> _emailAccountRepository;
-        private readonly IRepository<MessageTemplate> _messageTemplateRepository;
-        private readonly IRepository<ForumGroup> _forumGroupRepository;
-        private readonly IRepository<Forum> _forumRepository;
-        private readonly IRepository<Country> _countryRepository;
-        private readonly IRepository<StateProvince> _stateProvinceRepository;
-        private readonly IRepository<Discount> _discountRepository;
-        private readonly IRepository<BlogPost> _blogPostRepository;
-        private readonly IRepository<Topic> _topicRepository;
-        private readonly IRepository<NewsItem> _newsItemRepository;
-        private readonly IRepository<Poll> _pollRepository;
-        private readonly IRepository<ShippingMethod> _shippingMethodRepository;
         private readonly IRepository<DeliveryDate> _deliveryDateRepository;
-        private readonly IRepository<ProductAvailabilityRange> _productAvailabilityRangeRepository;
-        private readonly IRepository<ActivityLogType> _activityLogTypeRepository;
-        private readonly IRepository<ActivityLog> _activityLogRepository;
-        private readonly IRepository<ProductTag> _productTagRepository;
-        private readonly IRepository<ProductTemplate> _productTemplateRepository;
-        private readonly IRepository<CategoryTemplate> _categoryTemplateRepository;
+        private readonly IRepository<Discount> _discountRepository;
+        private readonly IRepository<EmailAccount> _emailAccountRepository;
+        private readonly IRepository<Forum> _forumRepository;
+        private readonly IRepository<ForumGroup> _forumGroupRepository;
+        private readonly IRepository<GiftCard> _giftCardRepository;
+        private readonly IRepository<Language> _languageRepository;
+        private readonly IRepository<Manufacturer> _manufacturerRepository;
         private readonly IRepository<ManufacturerTemplate> _manufacturerTemplateRepository;
-        private readonly IRepository<TopicTemplate> _topicTemplateRepository;
-        private readonly IRepository<ScheduleTask> _scheduleTaskRepository;
-        private readonly IRepository<ReturnRequestReason> _returnRequestReasonRepository;
-        private readonly IRepository<ReturnRequestAction> _returnRequestActionRepository;
-        private readonly IRepository<Address> _addressRepository;
-        private readonly IRepository<Warehouse> _warehouseRepository;
-        private readonly IRepository<Vendor> _vendorRepository;
-        private readonly IRepository<Affiliate> _affiliateRepository;
+        private readonly IRepository<MeasureDimension> _measureDimensionRepository;
+        private readonly IRepository<MeasureWeight> _measureWeightRepository;
+        private readonly IRepository<MessageTemplate> _messageTemplateRepository;
+        private readonly IRepository<NewsItem> _newsItemRepository;
         private readonly IRepository<Order> _orderRepository;
         private readonly IRepository<OrderItem> _orderItemRepository;
         private readonly IRepository<OrderNote> _orderNoteRepository;
-        private readonly IRepository<GiftCard> _giftCardRepository;
-        private readonly IRepository<Shipment> _shipmentRepository;
+        private readonly IRepository<Poll> _pollRepository;
+        private readonly IRepository<Product> _productRepository;
+        private readonly IRepository<ProductAttribute> _productAttributeRepository;
+        private readonly IRepository<ProductAvailabilityRange> _productAvailabilityRangeRepository;
+        private readonly IRepository<ProductTag> _productTagRepository;
+        private readonly IRepository<ProductTemplate> _productTemplateRepository;
+        private readonly IRepository<RelatedProduct> _relatedProductRepository;
+        private readonly IRepository<ReturnRequestAction> _returnRequestActionRepository;
+        private readonly IRepository<ReturnRequestReason> _returnRequestReasonRepository;
+        private readonly IRepository<ScheduleTask> _scheduleTaskRepository;
         private readonly IRepository<SearchTerm> _searchTermRepository;
+        private readonly IRepository<Shipment> _shipmentRepository;
         private readonly IRepository<ShipmentItem> _shipmentItemRepository;
+        private readonly IRepository<ShippingMethod> _shippingMethodRepository;
+        private readonly IRepository<SpecificationAttribute> _specificationAttributeRepository;
+        private readonly IRepository<StateProvince> _stateProvinceRepository;
         private readonly IRepository<StockQuantityHistory> _stockQuantityHistoryRepository;
-        private readonly IGenericAttributeService _genericAttributeService;
+        private readonly IRepository<Store> _storeRepository;
+        private readonly IRepository<TaxCategory> _taxCategoryRepository;
+        private readonly IRepository<Topic> _topicRepository;
+        private readonly IRepository<TopicTemplate> _topicTemplateRepository;
+        private readonly IRepository<UrlRecord> _urlRecordRepository;
+        private readonly IRepository<Vendor> _vendorRepository;
+        private readonly IRepository<Warehouse> _warehouseRepository;
         private readonly IWebHelper _webHelper;
-        private readonly IHostingEnvironment _hostingEnvironment;
-        private readonly INopFileProvider _fileProvider;
 
         #endregion
 
         #region Ctor
 
-        public CodeFirstInstallationService(IRepository<Store> storeRepository,
-            IRepository<MeasureDimension> measureDimensionRepository,
-            IRepository<MeasureWeight> measureWeightRepository,
-            IRepository<TaxCategory> taxCategoryRepository,
-            IRepository<Language> languageRepository,
+        public CodeFirstInstallationService(IGenericAttributeService genericAttributeService,
+            IHostingEnvironment hostingEnvironment,
+            INopFileProvider fileProvider,
+            IRepository<ActivityLog> activityLogRepository,
+            IRepository<ActivityLogType> activityLogTypeRepository,
+            IRepository<Address> addressRepository,
+            IRepository<Affiliate> affiliateRepository,
+            IRepository<BlogPost> blogPostRepository,
+            IRepository<Category> categoryRepository,
+            IRepository<CategoryTemplate> categoryTemplateRepository,
+            IRepository<CheckoutAttribute> checkoutAttributeRepository,
+            IRepository<Country> countryRepository,
             IRepository<Currency> currencyRepository,
             IRepository<Customer> customerRepository,
             IRepository<CustomerPassword> customerPasswordRepository,
             IRepository<CustomerRole> customerRoleRepository,
-            IRepository<SpecificationAttribute> specificationAttributeRepository,
-            IRepository<CheckoutAttribute> checkoutAttributeRepository,
-            IRepository<ProductAttribute> productAttributeRepository,
-            IRepository<Category> categoryRepository,
-            IRepository<Manufacturer> manufacturerRepository,
-            IRepository<Product> productRepository,
-            IRepository<UrlRecord> urlRecordRepository,
-            IRepository<RelatedProduct> relatedProductRepository,
-            IRepository<EmailAccount> emailAccountRepository,
-            IRepository<MessageTemplate> messageTemplateRepository,
-            IRepository<ForumGroup> forumGroupRepository,
-            IRepository<Forum> forumRepository,
-            IRepository<Country> countryRepository,
-            IRepository<StateProvince> stateProvinceRepository,
-            IRepository<Discount> discountRepository,
-            IRepository<BlogPost> blogPostRepository,
-            IRepository<Topic> topicRepository,
-            IRepository<NewsItem> newsItemRepository,
-            IRepository<Poll> pollRepository,
-            IRepository<ShippingMethod> shippingMethodRepository,
             IRepository<DeliveryDate> deliveryDateRepository,
-            IRepository<ProductAvailabilityRange> productAvailabilityRangeRepository,
-            IRepository<ActivityLogType> activityLogTypeRepository,
-            IRepository<ActivityLog> activityLogRepository,
-            IRepository<ProductTag> productTagRepository,
-            IRepository<ProductTemplate> productTemplateRepository,
-            IRepository<CategoryTemplate> categoryTemplateRepository,
+            IRepository<Discount> discountRepository,
+            IRepository<EmailAccount> emailAccountRepository,
+            IRepository<Forum> forumRepository,
+            IRepository<ForumGroup> forumGroupRepository,
+            IRepository<GiftCard> giftCardRepository,
+            IRepository<Language> languageRepository,
+            IRepository<Manufacturer> manufacturerRepository,
             IRepository<ManufacturerTemplate> manufacturerTemplateRepository,
-            IRepository<TopicTemplate> topicTemplateRepository,
-            IRepository<ScheduleTask> scheduleTaskRepository,
-            IRepository<ReturnRequestReason> returnRequestReasonRepository,
-            IRepository<ReturnRequestAction> returnRequestActionRepository,
-            IRepository<Address> addressRepository,
-            IRepository<Warehouse> warehouseRepository,
-            IRepository<Vendor> vendorRepository,
-            IRepository<Affiliate> affiliateRepository,
+            IRepository<MeasureDimension> measureDimensionRepository,
+            IRepository<MeasureWeight> measureWeightRepository,
+            IRepository<MessageTemplate> messageTemplateRepository,
+            IRepository<NewsItem> newsItemRepository,
             IRepository<Order> orderRepository,
             IRepository<OrderItem> orderItemRepository,
             IRepository<OrderNote> orderNoteRepository,
-            IRepository<GiftCard> giftCardRepository,
+            IRepository<Poll> pollRepository,
+            IRepository<Product> productRepository,
+            IRepository<ProductAttribute> productAttributeRepository,
+            IRepository<ProductAvailabilityRange> productAvailabilityRangeRepository,
+            IRepository<ProductTag> productTagRepository,
+            IRepository<ProductTemplate> productTemplateRepository,
+            IRepository<RelatedProduct> relatedProductRepository,
+            IRepository<ReturnRequestAction> returnRequestActionRepository,
+            IRepository<ReturnRequestReason> returnRequestReasonRepository,
+            IRepository<ScheduleTask> scheduleTaskRepository,
+            IRepository<SearchTerm> searchTermRepository,
             IRepository<Shipment> shipmentRepository,
             IRepository<ShipmentItem> shipmentItemRepository,
-            IRepository<SearchTerm> searchTermRepository,
+            IRepository<ShippingMethod> shippingMethodRepository,
+            IRepository<SpecificationAttribute> specificationAttributeRepository,
+            IRepository<StateProvince> stateProvinceRepository,
             IRepository<StockQuantityHistory> stockQuantityHistoryRepository,
-            IGenericAttributeService genericAttributeService,
-            IWebHelper webHelper,
-            IHostingEnvironment hostingEnvironment,
-            INopFileProvider fileProvider)
+            IRepository<Store> storeRepository,
+            IRepository<TaxCategory> taxCategoryRepository,
+            IRepository<Topic> topicRepository,
+            IRepository<TopicTemplate> topicTemplateRepository,
+            IRepository<UrlRecord> urlRecordRepository,
+            IRepository<Vendor> vendorRepository,
+            IRepository<Warehouse> warehouseRepository,
+            IWebHelper webHelper)
         {
-            this._storeRepository = storeRepository;
-            this._measureDimensionRepository = measureDimensionRepository;
-            this._measureWeightRepository = measureWeightRepository;
-            this._taxCategoryRepository = taxCategoryRepository;
-            this._languageRepository = languageRepository;
-            this._currencyRepository = currencyRepository;
-            this._customerRepository = customerRepository;
-            this._customerPasswordRepository = customerPasswordRepository;
-            this._customerRoleRepository = customerRoleRepository;
-            this._specificationAttributeRepository = specificationAttributeRepository;
-            this._checkoutAttributeRepository = checkoutAttributeRepository;
-            this._productAttributeRepository = productAttributeRepository;
-            this._categoryRepository = categoryRepository;
-            this._manufacturerRepository = manufacturerRepository;
-            this._productRepository = productRepository;
-            this._urlRecordRepository = urlRecordRepository;
-            this._relatedProductRepository = relatedProductRepository;
-            this._emailAccountRepository = emailAccountRepository;
-            this._messageTemplateRepository = messageTemplateRepository;
-            this._forumGroupRepository = forumGroupRepository;
-            this._forumRepository = forumRepository;
-            this._countryRepository = countryRepository;
-            this._stateProvinceRepository = stateProvinceRepository;
-            this._discountRepository = discountRepository;
-            this._blogPostRepository = blogPostRepository;
-            this._topicRepository = topicRepository;
-            this._newsItemRepository = newsItemRepository;
-            this._pollRepository = pollRepository;
-            this._shippingMethodRepository = shippingMethodRepository;
-            this._deliveryDateRepository = deliveryDateRepository;
-            this._productAvailabilityRangeRepository = productAvailabilityRangeRepository;
-            this._activityLogTypeRepository = activityLogTypeRepository;
-            this._activityLogRepository = activityLogRepository;
-            this._productTagRepository = productTagRepository;
-            this._productTemplateRepository = productTemplateRepository;
-            this._categoryTemplateRepository = categoryTemplateRepository;
-            this._manufacturerTemplateRepository = manufacturerTemplateRepository;
-            this._topicTemplateRepository = topicTemplateRepository;
-            this._scheduleTaskRepository = scheduleTaskRepository;
-            this._returnRequestReasonRepository = returnRequestReasonRepository;
-            this._returnRequestActionRepository = returnRequestActionRepository;
-            this._addressRepository = addressRepository;
-            this._warehouseRepository = warehouseRepository;
-            this._vendorRepository = vendorRepository;
-            this._affiliateRepository = affiliateRepository;
-            this._orderRepository = orderRepository;
-            this._orderItemRepository = orderItemRepository;
-            this._orderNoteRepository = orderNoteRepository;
-            this._giftCardRepository = giftCardRepository;
-            this._shipmentRepository = shipmentRepository;
-            this._shipmentItemRepository = shipmentItemRepository;
-            this._searchTermRepository = searchTermRepository;
-            this._stockQuantityHistoryRepository = stockQuantityHistoryRepository;
             this._genericAttributeService = genericAttributeService;
-            this._webHelper = webHelper;
             this._hostingEnvironment = hostingEnvironment;
             this._fileProvider = fileProvider;
+            this._activityLogRepository = activityLogRepository;
+            this._activityLogTypeRepository = activityLogTypeRepository;
+            this._addressRepository = addressRepository;
+            this._affiliateRepository = affiliateRepository;
+            this._blogPostRepository = blogPostRepository;
+            this._categoryRepository = categoryRepository;
+            this._categoryTemplateRepository = categoryTemplateRepository;
+            this._checkoutAttributeRepository = checkoutAttributeRepository;
+            this._countryRepository = countryRepository;
+            this._currencyRepository = currencyRepository;
+            this._customerPasswordRepository = customerPasswordRepository;
+            this._customerRepository = customerRepository;
+            this._customerRoleRepository = customerRoleRepository;
+            this._deliveryDateRepository = deliveryDateRepository;
+            this._discountRepository = discountRepository;
+            this._emailAccountRepository = emailAccountRepository;
+            this._forumGroupRepository = forumGroupRepository;
+            this._forumRepository = forumRepository;
+            this._giftCardRepository = giftCardRepository;
+            this._languageRepository = languageRepository;
+            this._manufacturerRepository = manufacturerRepository;
+            this._manufacturerTemplateRepository = manufacturerTemplateRepository;
+            this._measureDimensionRepository = measureDimensionRepository;
+            this._measureWeightRepository = measureWeightRepository;
+            this._messageTemplateRepository = messageTemplateRepository;
+            this._newsItemRepository = newsItemRepository;
+            this._orderItemRepository = orderItemRepository;
+            this._orderNoteRepository = orderNoteRepository;
+            this._orderRepository = orderRepository;
+            this._pollRepository = pollRepository;
+            this._productAttributeRepository = productAttributeRepository;
+            this._productAvailabilityRangeRepository = productAvailabilityRangeRepository;
+            this._productRepository = productRepository;
+            this._productTagRepository = productTagRepository;
+            this._productTemplateRepository = productTemplateRepository;
+            this._relatedProductRepository = relatedProductRepository;
+            this._returnRequestActionRepository = returnRequestActionRepository;
+            this._returnRequestReasonRepository = returnRequestReasonRepository;
+            this._scheduleTaskRepository = scheduleTaskRepository;
+            this._searchTermRepository = searchTermRepository;
+            this._shipmentItemRepository = shipmentItemRepository;
+            this._shipmentRepository = shipmentRepository;
+            this._shippingMethodRepository = shippingMethodRepository;
+            this._specificationAttributeRepository = specificationAttributeRepository;
+            this._stateProvinceRepository = stateProvinceRepository;
+            this._stockQuantityHistoryRepository = stockQuantityHistoryRepository;
+            this._storeRepository = storeRepository;
+            this._taxCategoryRepository = taxCategoryRepository;
+            this._topicRepository = topicRepository;
+            this._topicTemplateRepository = topicTemplateRepository;
+            this._urlRecordRepository = urlRecordRepository;
+            this._vendorRepository = vendorRepository;
+            this._warehouseRepository = warehouseRepository;
+            this._webHelper = webHelper;
         }
 
         #endregion
 
         #region Utilities
 
+        protected virtual string ValidateSeName<T>(T entity, string name) where T : BaseEntity
+        {
+            //simplified and very fast (no DB calls) version of "ValidateSeName" method of UrlRecordService
+            //we know that there's no same names of entities in sample data
+
+            if (entity == null)
+                throw new ArgumentNullException(nameof(entity));
+
+            var entityName = entity.GetUnproxiedEntityType().Name;
+            var entityId = entity.Id;
+            //validation
+            var okChars = "abcdefghijklmnopqrstuvwxyz1234567890 _-";
+            name = name.Trim().ToLowerInvariant();
+
+            var sb = new StringBuilder();
+            foreach (var c in name.ToCharArray())
+            {
+                var c2 = c.ToString();
+                if (okChars.Contains(c2))
+                {
+                    sb.Append(c2);
+                }
+            }
+            name = sb.ToString();
+            name = name.Replace(" ", "-");
+            while (name.Contains("--"))
+                name = name.Replace("--", "-");
+            while (name.Contains("__"))
+                name = name.Replace("__", "_");
+
+            //max length
+            name = CommonHelper.EnsureMaximumLength(name, NopSeoDefaults.SearchEngineNameLength);
+
+            return name;
+
+        }
+
         protected virtual string GetSamplesPath()
         {
-            return _fileProvider.GetAbsolutePath("images\\samples\\");
+            return _fileProvider.GetAbsolutePath(NopInstallationDefaults.SampleImagesPath);
         }
 
         protected virtual void InstallStores()
@@ -386,7 +425,9 @@ namespace Nop.Services.Installation
             var language = _languageRepository.Table.Single(l => l.Name == "English");
 
             //save resources
-            foreach (var filePath in _fileProvider.EnumerateFiles(_fileProvider.MapPath("~/App_Data/Localization/"), "*.nopres.xml"))
+            var directoryPath = _fileProvider.MapPath(NopInstallationDefaults.LocalizationResourcesPath);
+            var pattern = $"*.{NopInstallationDefaults.LocalizationResourcesFileExtension}";
+            foreach (var filePath in _fileProvider.EnumerateFiles(directoryPath, pattern))
             {
                 var localesXml = _fileProvider.ReadAllText(filePath, Encoding.UTF8);
                 var localizationService = EngineContext.Current.Resolve<ILocalizationService>();
@@ -416,7 +457,7 @@ namespace Nop.Services.Installation
                 {
                     Name = "Australian Dollar",
                     CurrencyCode = "AUD",
-                    Rate = 1.36M,
+                    Rate = 1.34M,
                     DisplayLocale = "en-AU",
                     CustomFormatting = "",
                     Published = false,
@@ -429,7 +470,7 @@ namespace Nop.Services.Installation
                 {
                     Name = "British Pound",
                     CurrencyCode = "GBP",
-                    Rate = 0.82M,
+                    Rate = 0.75M,
                     DisplayLocale = "en-GB",
                     CustomFormatting = "",
                     Published = false,
@@ -455,7 +496,7 @@ namespace Nop.Services.Installation
                 {
                     Name = "Chinese Yuan Renminbi",
                     CurrencyCode = "CNY",
-                    Rate = 6.93M,
+                    Rate = 6.43M,
                     DisplayLocale = "zh-CN",
                     CustomFormatting = "",
                     Published = false,
@@ -468,7 +509,7 @@ namespace Nop.Services.Installation
                 {
                     Name = "Euro",
                     CurrencyCode = "EUR",
-                    Rate = 0.95M,
+                    Rate = 0.86M,
                     DisplayLocale = "",
                     //CustomFormatting = "ˆ0.00",
                     CustomFormatting = $"{"\u20ac"}0.00",
@@ -482,7 +523,7 @@ namespace Nop.Services.Installation
                 {
                     Name = "Hong Kong Dollar",
                     CurrencyCode = "HKD",
-                    Rate = 7.75M,
+                    Rate = 7.84M,
                     DisplayLocale = "zh-HK",
                     CustomFormatting = "",
                     Published = false,
@@ -495,7 +536,7 @@ namespace Nop.Services.Installation
                 {
                     Name = "Japanese Yen",
                     CurrencyCode = "JPY",
-                    Rate = 116.64M,
+                    Rate = 110.45M,
                     DisplayLocale = "ja-JP",
                     CustomFormatting = "",
                     Published = false,
@@ -508,7 +549,7 @@ namespace Nop.Services.Installation
                 {
                     Name = "Russian Rouble",
                     CurrencyCode = "RUB",
-                    Rate = 59.75M,
+                    Rate = 63.25M,
                     DisplayLocale = "ru-RU",
                     CustomFormatting = "",
                     Published = false,
@@ -521,7 +562,7 @@ namespace Nop.Services.Installation
                 {
                     Name = "Swedish Krona",
                     CurrencyCode = "SEK",
-                    Rate = 9.08M,
+                    Rate = 8.80M,
                     DisplayLocale = "sv-SE",
                     CustomFormatting = "",
                     Published = false,
@@ -532,22 +573,9 @@ namespace Nop.Services.Installation
                 },
                 new Currency
                 {
-                    Name = "Romanian Leu",
-                    CurrencyCode = "RON",
-                    Rate = 4.28M,
-                    DisplayLocale = "ro-RO",
-                    CustomFormatting = "",
-                    Published = false,
-                    DisplayOrder = 11,
-                    CreatedOnUtc = DateTime.UtcNow,
-                    UpdatedOnUtc = DateTime.UtcNow,
-                    RoundingType = RoundingType.Rounding001
-                },
-                new Currency
-                {
                     Name = "Indian Rupee",
                     CurrencyCode = "INR",
-                    Rate = 68.17M,
+                    Rate = 68.03M,
                     DisplayLocale = "en-IN",
                     CustomFormatting = "",
                     Published = false,
@@ -4068,35 +4096,35 @@ namespace Nop.Services.Installation
                 Name = "Administrators",
                 Active = true,
                 IsSystemRole = true,
-                SystemName = SystemCustomerRoleNames.Administrators,
+                SystemName = NopCustomerDefaults.AdministratorsRoleName,
             };
             var crForumModerators = new CustomerRole
             {
                 Name = "Forum Moderators",
                 Active = true,
                 IsSystemRole = true,
-                SystemName = SystemCustomerRoleNames.ForumModerators,
+                SystemName = NopCustomerDefaults.ForumModeratorsRoleName,
             };
             var crRegistered = new CustomerRole
             {
                 Name = "Registered",
                 Active = true,
                 IsSystemRole = true,
-                SystemName = SystemCustomerRoleNames.Registered,
+                SystemName = NopCustomerDefaults.RegisteredRoleName,
             };
             var crGuests = new CustomerRole
             {
                 Name = "Guests",
                 Active = true,
                 IsSystemRole = true,
-                SystemName = SystemCustomerRoleNames.Guests,
+                SystemName = NopCustomerDefaults.GuestsRoleName,
             };
             var crVendors = new CustomerRole
             {
                 Name = "Vendors",
                 Active = true,
                 IsSystemRole = true,
-                SystemName = SystemCustomerRoleNames.Vendors,
+                SystemName = NopCustomerDefaults.VendorsRoleName,
             };
             var customerRoles = new List<CustomerRole>
             {
@@ -4144,18 +4172,22 @@ namespace Nop.Services.Installation
                 ZipPostalCode = "10021",
                 CreatedOnUtc = DateTime.UtcNow,
             };
-            adminUser.Addresses.Add(defaultAdminUserAddress);
+            //adminUser.Addresses.Add(defaultAdminUserAddress);
+            adminUser.CustomerAddressMappings.Add(new CustomerAddressMapping { Address = defaultAdminUserAddress });
             adminUser.BillingAddress = defaultAdminUserAddress;
             adminUser.ShippingAddress = defaultAdminUserAddress;
 
-            adminUser.CustomerRoles.Add(crAdministrators);
-            adminUser.CustomerRoles.Add(crForumModerators);
-            adminUser.CustomerRoles.Add(crRegistered);
+            //adminUser.CustomerRoles.Add(crAdministrators);
+            //adminUser.CustomerRoles.Add(crForumModerators);
+            //adminUser.CustomerRoles.Add(crRegistered);
+            adminUser.CustomerCustomerRoleMappings.Add(new CustomerCustomerRoleMapping { CustomerRole = crAdministrators });
+            adminUser.CustomerCustomerRoleMappings.Add(new CustomerCustomerRoleMapping { CustomerRole = crForumModerators });
+            adminUser.CustomerCustomerRoleMappings.Add(new CustomerCustomerRoleMapping { CustomerRole = crRegistered });
 
             _customerRepository.Insert(adminUser);
             //set default customer name
-            _genericAttributeService.SaveAttribute(adminUser, SystemCustomerAttributeNames.FirstName, "John");
-            _genericAttributeService.SaveAttribute(adminUser, SystemCustomerAttributeNames.LastName, "Smith");
+            _genericAttributeService.SaveAttribute(adminUser, NopCustomerDefaults.FirstNameAttribute, "John");
+            _genericAttributeService.SaveAttribute(adminUser, NopCustomerDefaults.LastNameAttribute, "Smith");
 
             //set hashed admin password
             var customerRegistrationService = EngineContext.Current.Resolve<ICustomerRegistrationService>();
@@ -4190,16 +4222,18 @@ namespace Nop.Services.Installation
                 ZipPostalCode = "90077",
                 CreatedOnUtc = DateTime.UtcNow,
             };
-            secondUser.Addresses.Add(defaultSecondUserAddress);
+            //secondUser.Addresses.Add(defaultSecondUserAddress);
+            secondUser.CustomerAddressMappings.Add(new CustomerAddressMapping { Address = defaultSecondUserAddress });
             secondUser.BillingAddress = defaultSecondUserAddress;
             secondUser.ShippingAddress = defaultSecondUserAddress;
 
-            secondUser.CustomerRoles.Add(crRegistered);
+            //secondUser.CustomerRoles.Add(crRegistered);
+            secondUser.CustomerCustomerRoleMappings.Add(new CustomerCustomerRoleMapping { CustomerRole = crRegistered });
 
             _customerRepository.Insert(secondUser);
             //set default customer name
-            _genericAttributeService.SaveAttribute(secondUser, SystemCustomerAttributeNames.FirstName, defaultSecondUserAddress.FirstName);
-            _genericAttributeService.SaveAttribute(secondUser, SystemCustomerAttributeNames.LastName, defaultSecondUserAddress.LastName);
+            _genericAttributeService.SaveAttribute(secondUser, NopCustomerDefaults.FirstNameAttribute, defaultSecondUserAddress.FirstName);
+            _genericAttributeService.SaveAttribute(secondUser, NopCustomerDefaults.LastNameAttribute, defaultSecondUserAddress.LastName);
 
             //set customer password
             _customerPasswordRepository.Insert(new CustomerPassword
@@ -4238,16 +4272,18 @@ namespace Nop.Services.Installation
                 ZipPostalCode = "NW1 6XE",
                 CreatedOnUtc = DateTime.UtcNow,
             };
-            thirdUser.Addresses.Add(defaultThirdUserAddress);
+            //thirdUser.Addresses.Add(defaultThirdUserAddress);
+            thirdUser.CustomerAddressMappings.Add(new CustomerAddressMapping { Address = defaultThirdUserAddress });
             thirdUser.BillingAddress = defaultThirdUserAddress;
             thirdUser.ShippingAddress = defaultThirdUserAddress;
 
-            thirdUser.CustomerRoles.Add(crRegistered);
+            //thirdUser.CustomerRoles.Add(crRegistered);
+            thirdUser.CustomerCustomerRoleMappings.Add(new CustomerCustomerRoleMapping { CustomerRole = crRegistered });
 
             _customerRepository.Insert(thirdUser);
             //set default customer name
-            _genericAttributeService.SaveAttribute(thirdUser, SystemCustomerAttributeNames.FirstName, defaultThirdUserAddress.FirstName);
-            _genericAttributeService.SaveAttribute(thirdUser, SystemCustomerAttributeNames.LastName, defaultThirdUserAddress.LastName);
+            _genericAttributeService.SaveAttribute(thirdUser, NopCustomerDefaults.FirstNameAttribute, defaultThirdUserAddress.FirstName);
+            _genericAttributeService.SaveAttribute(thirdUser, NopCustomerDefaults.LastNameAttribute, defaultThirdUserAddress.LastName);
 
             //set customer password
             _customerPasswordRepository.Insert(new CustomerPassword
@@ -4286,16 +4322,18 @@ namespace Nop.Services.Installation
                 ZipPostalCode = "KY16 9AX",
                 CreatedOnUtc = DateTime.UtcNow,
             };
-            fourthUser.Addresses.Add(defaultFourthUserAddress);
+            //fourthUser.Addresses.Add(defaultFourthUserAddress);
+            fourthUser.CustomerAddressMappings.Add(new CustomerAddressMapping { Address = defaultFourthUserAddress });
             fourthUser.BillingAddress = defaultFourthUserAddress;
             fourthUser.ShippingAddress = defaultFourthUserAddress;
 
-            fourthUser.CustomerRoles.Add(crRegistered);
+            //fourthUser.CustomerRoles.Add(crRegistered);
+            fourthUser.CustomerCustomerRoleMappings.Add(new CustomerCustomerRoleMapping { CustomerRole = crRegistered });
 
             _customerRepository.Insert(fourthUser);
             //set default customer name
-            _genericAttributeService.SaveAttribute(fourthUser, SystemCustomerAttributeNames.FirstName, defaultFourthUserAddress.FirstName);
-            _genericAttributeService.SaveAttribute(fourthUser, SystemCustomerAttributeNames.LastName, defaultFourthUserAddress.LastName);
+            _genericAttributeService.SaveAttribute(fourthUser, NopCustomerDefaults.FirstNameAttribute, defaultFourthUserAddress.FirstName);
+            _genericAttributeService.SaveAttribute(fourthUser, NopCustomerDefaults.LastNameAttribute, defaultFourthUserAddress.LastName);
 
             //set customer password
             _customerPasswordRepository.Insert(new CustomerPassword
@@ -4335,16 +4373,18 @@ namespace Nop.Services.Installation
                 ZipPostalCode = "99901",
                 CreatedOnUtc = DateTime.UtcNow,
             };
-            fifthUser.Addresses.Add(defaultFifthUserAddress);
+            //fifthUser.Addresses.Add(defaultFifthUserAddress);
+            fifthUser.CustomerAddressMappings.Add(new CustomerAddressMapping { Address = defaultFifthUserAddress });
             fifthUser.BillingAddress = defaultFifthUserAddress;
             fifthUser.ShippingAddress = defaultFifthUserAddress;
 
-            fifthUser.CustomerRoles.Add(crRegistered);
+            //fifthUser.CustomerRoles.Add(crRegistered);
+            fifthUser.CustomerCustomerRoleMappings.Add(new CustomerCustomerRoleMapping { CustomerRole = crRegistered });
 
             _customerRepository.Insert(fifthUser);
             //set default customer name
-            _genericAttributeService.SaveAttribute(fifthUser, SystemCustomerAttributeNames.FirstName, defaultFifthUserAddress.FirstName);
-            _genericAttributeService.SaveAttribute(fifthUser, SystemCustomerAttributeNames.LastName, defaultFifthUserAddress.LastName);
+            _genericAttributeService.SaveAttribute(fifthUser, NopCustomerDefaults.FirstNameAttribute, defaultFifthUserAddress.FirstName);
+            _genericAttributeService.SaveAttribute(fifthUser, NopCustomerDefaults.LastNameAttribute, defaultFifthUserAddress.LastName);
 
             //set customer password
             _customerPasswordRepository.Insert(new CustomerPassword
@@ -4384,16 +4424,18 @@ namespace Nop.Services.Installation
                 ZipPostalCode = "S7K 1J9",
                 CreatedOnUtc = DateTime.UtcNow,
             };
-            sixthUser.Addresses.Add(defaultSixthUserAddress);
+            //sixthUser.Addresses.Add(defaultSixthUserAddress);
+            sixthUser.CustomerAddressMappings.Add(new CustomerAddressMapping { Address = defaultSixthUserAddress });
             sixthUser.BillingAddress = defaultSixthUserAddress;
             sixthUser.ShippingAddress = defaultSixthUserAddress;
 
-            sixthUser.CustomerRoles.Add(crRegistered);
+            //sixthUser.CustomerRoles.Add(crRegistered);
+            sixthUser.CustomerCustomerRoleMappings.Add(new CustomerCustomerRoleMapping { CustomerRole = crRegistered });
 
             _customerRepository.Insert(sixthUser);
             //set default customer name
-            _genericAttributeService.SaveAttribute(sixthUser, SystemCustomerAttributeNames.FirstName, defaultSixthUserAddress.FirstName);
-            _genericAttributeService.SaveAttribute(sixthUser, SystemCustomerAttributeNames.LastName, defaultSixthUserAddress.LastName);
+            _genericAttributeService.SaveAttribute(sixthUser, NopCustomerDefaults.FirstNameAttribute, defaultSixthUserAddress.FirstName);
+            _genericAttributeService.SaveAttribute(sixthUser, NopCustomerDefaults.LastNameAttribute, defaultSixthUserAddress.LastName);
 
             //set customer password
             _customerPasswordRepository.Insert(new CustomerPassword
@@ -4413,12 +4455,13 @@ namespace Nop.Services.Installation
                 AdminComment = "Built-in system guest record used for requests from search engines.",
                 Active = true,
                 IsSystemAccount = true,
-                SystemName = SystemCustomerNames.SearchEngine,
+                SystemName = NopCustomerDefaults.SearchEngineCustomerName,
                 CreatedOnUtc = DateTime.UtcNow,
                 LastActivityDateUtc = DateTime.UtcNow,
                 RegisteredInStoreId = storeId
             };
-            searchEngineUser.CustomerRoles.Add(crGuests);
+            //searchEngineUser.CustomerRoles.Add(crGuests);
+            searchEngineUser.CustomerCustomerRoleMappings.Add(new CustomerCustomerRoleMapping { CustomerRole = crGuests });
             _customerRepository.Insert(searchEngineUser);
 
 
@@ -4430,12 +4473,13 @@ namespace Nop.Services.Installation
                 AdminComment = "Built-in system record used for background tasks.",
                 Active = true,
                 IsSystemAccount = true,
-                SystemName = SystemCustomerNames.BackgroundTask,
+                SystemName = NopCustomerDefaults.BackgroundTaskCustomerName,
                 CreatedOnUtc = DateTime.UtcNow,
                 LastActivityDateUtc = DateTime.UtcNow,
                 RegisteredInStoreId = storeId
             };
-            backgroundTaskUser.CustomerRoles.Add(crGuests);
+            //backgroundTaskUser.CustomerRoles.Add(crGuests);
+            backgroundTaskUser.CustomerCustomerRoleMappings.Add(new CustomerCustomerRoleMapping { CustomerRole = crGuests });
             _customerRepository.Insert(backgroundTaskUser);
         }
 
@@ -5600,7 +5644,7 @@ namespace Nop.Services.Installation
                 {
                     Name = MessageTemplateSystemNames.RecurringPaymentCancelledCustomerNotification,
                     Subject = "%Store.Name%. Recurring payment cancelled",
-                    Body = $"<p>{Environment.NewLine}<a href=\"%Store.URL%\">%Store.Name%</a>{Environment.NewLine}<br />{Environment.NewLine}<br />{Environment.NewLine}Hello %Customer.FullName%,{Environment.NewLine}<br />{Environment.NewLine}%if (%RecurringPayment.CancelAfterFailedPayment%) It appears your credit card didn't go through for this recurring payment (<a href=\"%Order.OrderURLForCustomer%\" target=\"_blank\">%Order.OrderURLForCustomer%</a>){Environment.NewLine}<br />{Environment.NewLine}So your subscription has been canceled. endif% %if (!%RecurringPayment.CancelAfterFailedPayment%) The recurring payment ID=%RecurringPayment.ID% was cancelled. endif%{Environment.NewLine}</p>{Environment.NewLine}",
+                    Body = $"<p>{Environment.NewLine}<a href=\"%Store.URL%\">%Store.Name%</a>{Environment.NewLine}<br />{Environment.NewLine}<br />{Environment.NewLine}Hello %Customer.FullName%,{Environment.NewLine}<br />{Environment.NewLine}%if (%RecurringPayment.CancelAfterFailedPayment%) It appears your credit card didn't go through for this recurring payment (<a href=\"%Order.OrderURLForCustomer%\" target=\"_blank\">%Order.OrderURLForCustomer%</a>){Environment.NewLine}<br />{Environment.NewLine}So your subscription has been cancelled. endif% %if (!%RecurringPayment.CancelAfterFailedPayment%) The recurring payment ID=%RecurringPayment.ID% was cancelled. endif%{Environment.NewLine}</p>{Environment.NewLine}",
                     IsActive = true,
                     EmailAccountId = eaGeneral.Id,
                 },
@@ -5881,10 +5925,10 @@ namespace Nop.Services.Installation
                 _urlRecordRepository.Insert(new UrlRecord
                 {
                     EntityId = topic.Id,
-                    EntityName = "Topic",
+                    EntityName = typeof(Topic).Name,
                     LanguageId = 0,
                     IsActive = true,
-                    Slug = topic.ValidateSeName("", !string.IsNullOrEmpty(topic.Title) ? topic.Title : topic.SystemName, true)
+                    Slug = ValidateSeName(topic, !string.IsNullOrEmpty(topic.Title) ? topic.Title : topic.SystemName)
                 });
             }
         }
@@ -5905,7 +5949,6 @@ namespace Nop.Services.Installation
             settingService.SaveSetting(new CommonSettings
             {
                 UseSystemEmailForContactUsForm = true,
-                UseStoredProceduresIfSupported = true,
                 UseStoredProcedureForLoadingCategories = true,
                 SitemapEnabled = true,
                 SitemapPageSize = 200,
@@ -5921,7 +5964,11 @@ namespace Nop.Services.Installation
                 RenderXuaCompatible = false,
                 XuaCompatibleValue = "IE=edge",
                 BbcodeEditorOpenLinksInNewWindow = false,
-                PopupForTermsOfServiceLinks = true
+                PopupForTermsOfServiceLinks = true,
+                JqueryMigrateScriptLoggingActive = false,
+                SupportPreviousNopcommerceVersions = true,
+                UseResponseCompression = false,
+                StaticFilesCacheControl = "public,max-age=604800"
             });
 
             settingService.SaveSetting(new SeoSettings
@@ -6006,7 +6053,9 @@ namespace Nop.Services.Installation
                 GridPageSizes = "10, 15, 20, 50, 100",
                 RichEditorAdditionalSettings = null,
                 RichEditorAllowJavaScript = false,
+                RichEditorAllowStyleTag = false,
                 UseRichEditorInMessageTemplates = false,
+                CheckCopyrightRemovalKey = true,
                 UseIsoDateFormatInJsonResult = true,
                 UseNestedSetting = true
             });
@@ -6016,7 +6065,14 @@ namespace Nop.Services.Installation
                 Weight = true,
                 Dimensions = true,
                 ProductAttributes = true,
-                SpecificationAttributes =true
+                SpecificationAttributes = true
+            });
+
+            settingService.SaveSetting(new GdprSettings
+            {
+                GdprEnabled = false,
+                LogPrivacyPolicyConsent = true,
+                LogNewsletterConsent = true
             });
 
             settingService.SaveSetting(new CatalogSettings
@@ -6054,6 +6110,7 @@ namespace Nop.Services.Installation
                 CompareProductsNumber = 4,
                 ProductSearchAutoCompleteEnabled = true,
                 ProductSearchAutoCompleteNumberOfProducts = 10,
+                ShowLinkToAllResultInSearchAutoComplete = false,
                 ProductSearchTermMinimumLength = 3,
                 ShowProductImagesInSearchAutoComplete = false,
                 ShowBestsellersOnHomepage = false,
@@ -6097,7 +6154,9 @@ namespace Nop.Services.Installation
                 ExportImportProductSpecificationAttributes = true,
                 ExportImportUseDropdownlistsForAssociatedEntities = true,
                 ExportImportProductsCountInOneFile = 500,
-                ExportImportSplitProductsFile = false
+                ExportImportSplitProductsFile = false,
+                ExportImportRelatedEntitiesByName = true,
+                CountDisplayedYearsDatePicker = 1
             });
 
             settingService.SaveSetting(new LocalizationSettings
@@ -6165,6 +6224,7 @@ namespace Nop.Services.Installation
                 SuffixDeletedCustomers = false,
                 EnteringEmailTwice = false,
                 RequireRegistrationForDownloadableProducts = false,
+                AllowCustomersToCheckGiftCardBalance = false,
                 DeleteGuestTaskOlderThanMinutes = 1440
             });
 
@@ -6239,6 +6299,7 @@ namespace Nop.Services.Installation
                 PointsForPurchases_Amount = 10,
                 PointsForPurchases_Points = 1,
                 MinOrderTotalToAwardPoints = 0,
+                MaximumRewardPointsToUsePerOrder = 0,
                 PurchasesPointsValidity = 45,
                 ActivationDelay = 0,
                 ActivationDelayPeriodId = 0,
@@ -6529,6 +6590,12 @@ namespace Nop.Services.Installation
                 DisplayShoppingCartFooterItem = true,
                 DisplayWishlistFooterItem = true,
                 DisplayApplyVendorAccountFooterItem = true
+            });
+
+            settingService.SaveSetting(new CaptchaSettings
+            {
+                ReCaptchaDefaultLanguage = "",
+                AutomaticallyChooseLanguage = true
             });
         }
 
@@ -7040,10 +7107,10 @@ namespace Nop.Services.Installation
                 _urlRecordRepository.Insert(new UrlRecord
                 {
                     EntityId = category.Id,
-                    EntityName = "Category",
+                    EntityName = typeof(Category).Name,
                     LanguageId = 0,
                     IsActive = true,
-                    Slug = category.ValidateSeName("", category.Name, true)
+                    Slug = ValidateSeName(category, category.Name)
                 });
             }
         }
@@ -7113,10 +7180,10 @@ namespace Nop.Services.Installation
                 _urlRecordRepository.Insert(new UrlRecord
                 {
                     EntityId = manufacturer.Id,
-                    EntityName = "Manufacturer",
+                    EntityName = typeof(Manufacturer).Name,
                     LanguageId = 0,
                     IsActive = true,
-                    Slug = manufacturer.ValidateSeName("", manufacturer.Name, true)
+                    Slug = ValidateSeName(manufacturer, manufacturer.Name)
                 });
             }
         }
@@ -9877,7 +9944,7 @@ namespace Nop.Services.Installation
             #endregion
 
             #region Jewelry
-            
+
             var productElegantGemstoneNecklace = new Product
             {
                 ProductType = ProductType.SimpleProduct,
@@ -10171,10 +10238,10 @@ namespace Nop.Services.Installation
                 _urlRecordRepository.Insert(new UrlRecord
                 {
                     EntityId = product.Id,
-                    EntityName = "Product",
+                    EntityName = typeof(Product).Name,
                     LanguageId = 0,
                     IsActive = true,
-                    Slug = product.ValidateSeName("", product.Name, true)
+                    Slug = ValidateSeName(product, product.Name)
                 });
             }
 
@@ -10846,10 +10913,10 @@ namespace Nop.Services.Installation
                 _urlRecordRepository.Insert(new UrlRecord
                 {
                     EntityId = blogPost.Id,
-                    EntityName = "BlogPost",
+                    EntityName = typeof(BlogPost).Name,
                     LanguageId = blogPost.LanguageId,
                     IsActive = true,
-                    Slug = blogPost.ValidateSeName("", blogPost.Title, true)
+                    Slug = ValidateSeName(blogPost, blogPost.Title)
                 });
             }
 
@@ -10923,10 +10990,10 @@ namespace Nop.Services.Installation
                 _urlRecordRepository.Insert(new UrlRecord
                 {
                     EntityId = newsItem.Id,
-                    EntityName = "NewsItem",
+                    EntityName = typeof(NewsItem).Name,
                     LanguageId = newsItem.LanguageId,
                     IsActive = true,
-                    Slug = newsItem.ValidateSeName("", newsItem.Title, true)
+                    Slug = ValidateSeName(newsItem, newsItem.Title)
                 });
             }
 
@@ -11166,6 +11233,12 @@ namespace Nop.Services.Installation
                 },
                 new ActivityLogType
                 {
+                    SystemKeyword = "AddNewReviewType",
+                    Enabled = true,
+                    Name = "Add a new review type"
+                },
+                new ActivityLogType
+                {
                     SystemKeyword = "AddNewVendor",
                     Enabled = true,
                     Name = "Add a new vendor"
@@ -11379,6 +11452,12 @@ namespace Nop.Services.Installation
                     SystemKeyword = "DeleteReturnRequest",
                     Enabled = true,
                     Name = "Delete a return request"
+                },
+                new ActivityLogType
+                {
+                    SystemKeyword = "DeleteReviewType",
+                    Enabled = true,
+                    Name = "Delete a review type"
                 },
                 new ActivityLogType
                 {
@@ -11625,6 +11704,12 @@ namespace Nop.Services.Installation
                     SystemKeyword = "EditReturnRequest",
                     Enabled = true,
                     Name = "Edit a return request"
+                },
+                new ActivityLogType
+                {
+                    SystemKeyword = "EditReviewType",
+                    Enabled = true,
+                    Name = "Edit a review type"
                 },
                 new ActivityLogType
                 {
@@ -12125,10 +12210,10 @@ namespace Nop.Services.Installation
                 _urlRecordRepository.Insert(new UrlRecord
                 {
                     EntityId = vendor.Id,
-                    EntityName = "Vendor",
+                    EntityName = typeof(Vendor).Name,
                     LanguageId = 0,
                     IsActive = true,
-                    Slug = vendor.ValidateSeName("", vendor.Name, true)
+                    Slug = ValidateSeName(vendor, vendor.Name)
                 });
             }
         }
@@ -12168,17 +12253,18 @@ namespace Nop.Services.Installation
                     Name = tag,
                 };
             }
-            product.ProductTags.Add(productTag);
+            //product.ProductTags.Add(productTag);
+            product.ProductProductTagMappings.Add(new ProductProductTagMapping { ProductTag = productTag });
             _productRepository.Update(product);
 
             //search engine name
             _urlRecordRepository.Insert(new UrlRecord()
             {
                 EntityId = productTag.Id,
-                EntityName = "ProductTag",
+                EntityName = typeof(ProductTag).Name,
                 LanguageId = 0,
                 IsActive = true,
-                Slug = productTag.ValidateSeName("", productTag.Name, true)
+                Slug = ValidateSeName(productTag, productTag.Name)
             });
         }
 

@@ -16,8 +16,8 @@ using Nop.Services.Media;
 using Nop.Services.Security;
 using Nop.Services.Seo;
 using Nop.Services.Stores;
-using Nop.Web.Areas.Admin.Extensions;
 using Nop.Web.Areas.Admin.Factories;
+using Nop.Web.Areas.Admin.Infrastructure.Mapper.Extensions;
 using Nop.Web.Areas.Admin.Models.Catalog;
 using Nop.Web.Framework.Controllers;
 using Nop.Web.Framework.Mvc;
@@ -122,7 +122,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                     localized.LanguageId);
 
                 //search engine name
-                var seName = manufacturer.ValidateSeName(localized.SeName, localized.Name, false);
+                var seName = _urlRecordService.ValidateSeName(manufacturer, localized.SeName, localized.Name, false);
                 _urlRecordService.SaveSlug(manufacturer, seName, localized.LanguageId);
             }
         }
@@ -237,13 +237,13 @@ namespace Nop.Web.Areas.Admin.Controllers
 
             if (ModelState.IsValid)
             {
-                var manufacturer = model.ToEntity();
+                var manufacturer = model.ToEntity<Manufacturer>();
                 manufacturer.CreatedOnUtc = DateTime.UtcNow;
                 manufacturer.UpdatedOnUtc = DateTime.UtcNow;
                 _manufacturerService.InsertManufacturer(manufacturer);
 
                 //search engine name
-                model.SeName = manufacturer.ValidateSeName(model.SeName, manufacturer.Name, true);
+                model.SeName = _urlRecordService.ValidateSeName(manufacturer, model.SeName, manufacturer.Name, true);
                 _urlRecordService.SaveSlug(manufacturer, model.SeName, 0);
 
                 //locales
@@ -254,7 +254,8 @@ namespace Nop.Web.Areas.Admin.Controllers
                 foreach (var discount in allDiscounts)
                 {
                     if (model.SelectedDiscountIds != null && model.SelectedDiscountIds.Contains(discount.Id))
-                        manufacturer.AppliedDiscounts.Add(discount);
+                        //manufacturer.AppliedDiscounts.Add(discount);
+                        manufacturer.DiscountManufacturerMappings.Add(new DiscountManufacturerMapping { Discount = discount });
                 }
 
                 _manufacturerService.UpdateManufacturer(manufacturer);
@@ -325,7 +326,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                 _manufacturerService.UpdateManufacturer(manufacturer);
 
                 //search engine name
-                model.SeName = manufacturer.ValidateSeName(model.SeName, manufacturer.Name, true);
+                model.SeName = _urlRecordService.ValidateSeName(manufacturer, model.SeName, manufacturer.Name, true);
                 _urlRecordService.SaveSlug(manufacturer, model.SeName, 0);
 
                 //locales
@@ -338,14 +339,15 @@ namespace Nop.Web.Areas.Admin.Controllers
                     if (model.SelectedDiscountIds != null && model.SelectedDiscountIds.Contains(discount.Id))
                     {
                         //new discount
-                        if (manufacturer.AppliedDiscounts.Count(d => d.Id == discount.Id) == 0)
-                            manufacturer.AppliedDiscounts.Add(discount);
+                        if (manufacturer.DiscountManufacturerMappings.Count(mapping => mapping.DiscountId == discount.Id) == 0)
+                            manufacturer.DiscountManufacturerMappings.Add(new DiscountManufacturerMapping { Discount = discount });
                     }
                     else
                     {
                         //remove discount
-                        if (manufacturer.AppliedDiscounts.Count(d => d.Id == discount.Id) > 0)
-                            manufacturer.AppliedDiscounts.Remove(discount);
+                        if (manufacturer.DiscountManufacturerMappings.Count(mapping => mapping.DiscountId == discount.Id) > 0)
+                            manufacturer.DiscountManufacturerMappings
+                                .Remove(manufacturer.DiscountManufacturerMappings.FirstOrDefault(mapping => mapping.DiscountId == discount.Id));
                     }
                 }
 
@@ -575,7 +577,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                 foreach (var product in selectedProducts)
                 {
                     //whether product manufacturer with such parameters already exists
-                    if (existingProductmanufacturers.FindProductManufacturer(product.Id, model.ManufacturerId) != null)
+                    if (_manufacturerService.FindProductManufacturer(existingProductmanufacturers, product.Id, model.ManufacturerId) != null)
                         continue;
 
                     //insert the new product manufacturer mapping

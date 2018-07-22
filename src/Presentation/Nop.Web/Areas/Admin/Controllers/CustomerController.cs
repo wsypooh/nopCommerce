@@ -8,14 +8,17 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
 using Nop.Core;
 using Nop.Core.Domain.Catalog;
+using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Forums;
+using Nop.Core.Domain.Gdpr;
 using Nop.Core.Domain.Messages;
 using Nop.Core.Domain.Tax;
 using Nop.Services.Common;
 using Nop.Services.Customers;
 using Nop.Services.ExportImport;
 using Nop.Services.Forums;
+using Nop.Services.Gdpr;
 using Nop.Services.Helpers;
 using Nop.Services.Localization;
 using Nop.Services.Logging;
@@ -24,10 +27,9 @@ using Nop.Services.Orders;
 using Nop.Services.Security;
 using Nop.Services.Stores;
 using Nop.Services.Tax;
-using Nop.Web.Areas.Admin.Extensions;
 using Nop.Web.Areas.Admin.Factories;
+using Nop.Web.Areas.Admin.Infrastructure.Mapper.Extensions;
 using Nop.Web.Areas.Admin.Models.Customers;
-using Nop.Web.Extensions;
 using Nop.Web.Framework.Controllers;
 using Nop.Web.Framework.Mvc;
 using Nop.Web.Framework.Mvc.Filters;
@@ -42,8 +44,8 @@ namespace Nop.Web.Areas.Admin.Controllers
         private readonly DateTimeSettings _dateTimeSettings;
         private readonly EmailAccountSettings _emailAccountSettings;
         private readonly ForumSettings _forumSettings;
+        private readonly GdprSettings _gdprSettings;
         private readonly IAddressAttributeParser _addressAttributeParser;
-        private readonly IAddressAttributeService _addressAttributeService;
         private readonly IAddressService _addressService;
         private readonly ICustomerActivityService _customerActivityService;
         private readonly ICustomerAttributeParser _customerAttributeParser;
@@ -55,6 +57,7 @@ namespace Nop.Web.Areas.Admin.Controllers
         private readonly IEmailAccountService _emailAccountService;
         private readonly IExportManager _exportManager;
         private readonly IForumService _forumService;
+        private readonly IGdprService _gdprService;
         private readonly IGenericAttributeService _genericAttributeService;
         private readonly ILocalizationService _localizationService;
         private readonly INewsLetterSubscriptionService _newsLetterSubscriptionService;
@@ -76,8 +79,8 @@ namespace Nop.Web.Areas.Admin.Controllers
             DateTimeSettings dateTimeSettings,
             EmailAccountSettings emailAccountSettings,
             ForumSettings forumSettings,
+            GdprSettings gdprSettings,
             IAddressAttributeParser addressAttributeParser,
-            IAddressAttributeService addressAttributeService,
             IAddressService addressService,
             ICustomerActivityService customerActivityService,
             ICustomerAttributeParser customerAttributeParser,
@@ -89,6 +92,7 @@ namespace Nop.Web.Areas.Admin.Controllers
             IEmailAccountService emailAccountService,
             IExportManager exportManager,
             IForumService forumService,
+            IGdprService gdprService,
             IGenericAttributeService genericAttributeService,
             ILocalizationService localizationService,
             INewsLetterSubscriptionService newsLetterSubscriptionService,
@@ -106,8 +110,8 @@ namespace Nop.Web.Areas.Admin.Controllers
             this._dateTimeSettings = dateTimeSettings;
             this._emailAccountSettings = emailAccountSettings;
             this._forumSettings = forumSettings;
+            this._gdprSettings = gdprSettings;
             this._addressAttributeParser = addressAttributeParser;
-            this._addressAttributeService = addressAttributeService;
             this._addressService = addressService;
             this._customerActivityService = customerActivityService;
             this._customerAttributeParser = customerAttributeParser;
@@ -119,6 +123,7 @@ namespace Nop.Web.Areas.Admin.Controllers
             this._emailAccountService = emailAccountService;
             this._exportManager = exportManager;
             this._forumService = forumService;
+            this._gdprService = gdprService;
             this._genericAttributeService = genericAttributeService;
             this._localizationService = localizationService;
             this._newsLetterSubscriptionService = newsLetterSubscriptionService;
@@ -144,8 +149,8 @@ namespace Nop.Web.Areas.Admin.Controllers
 
             //ensure a customer is not added to both 'Guests' and 'Registered' customer roles
             //ensure that a customer is in at least one required role ('Guests' and 'Registered')
-            var isInGuestsRole = customerRoles.FirstOrDefault(cr => cr.SystemName == SystemCustomerRoleNames.Guests) != null;
-            var isInRegisteredRole = customerRoles.FirstOrDefault(cr => cr.SystemName == SystemCustomerRoleNames.Registered) != null;
+            var isInGuestsRole = customerRoles.FirstOrDefault(cr => cr.SystemName == NopCustomerDefaults.GuestsRoleName) != null;
+            var isInRegisteredRole = customerRoles.FirstOrDefault(cr => cr.SystemName == NopCustomerDefaults.RegisteredRoleName) != null;
             if (isInGuestsRole && isInRegisteredRole)
                 return _localizationService.GetResource("Admin.Customers.Customers.GuestsAndRegisteredRolesError");
             if (!isInGuestsRole && !isInRegisteredRole)
@@ -235,7 +240,7 @@ namespace Nop.Web.Areas.Admin.Controllers
 
         private bool SecondAdminAccountExists(Customer customer)
         {
-            var customers = _customerService.GetAllCustomers(customerRoleIds: new[] { _customerService.GetCustomerRoleBySystemName(SystemCustomerRoleNames.Administrators).Id });
+            var customers = _customerService.GetAllCustomers(customerRoleIds: new[] { _customerService.GetCustomerRoleBySystemName(NopCustomerDefaults.AdministratorsRoleName).Id });
 
             return customers.Any(c => c.Active && c.Id != customer.Id);
         }
@@ -313,7 +318,7 @@ namespace Nop.Web.Areas.Admin.Controllers
             }
 
             // Ensure that valid email address is entered if Registered role is checked to avoid registered customers with empty email address
-            if (newCustomerRoles.Any() && newCustomerRoles.FirstOrDefault(c => c.SystemName == SystemCustomerRoleNames.Registered) != null &&
+            if (newCustomerRoles.Any() && newCustomerRoles.FirstOrDefault(c => c.SystemName == NopCustomerDefaults.RegisteredRoleName) != null &&
                 !CommonHelper.IsValidEmail(model.Email))
             {
                 ModelState.AddModelError(string.Empty, _localizationService.GetResource("Admin.Customers.Customers.ValidEmailRequiredRegisteredRole"));
@@ -322,7 +327,7 @@ namespace Nop.Web.Areas.Admin.Controllers
 
             //custom customer attributes
             var customerAttributesXml = ParseCustomCustomerAttributes(model.Form);
-            if (newCustomerRoles.Any() && newCustomerRoles.FirstOrDefault(c => c.SystemName == SystemCustomerRoleNames.Registered) != null)
+            if (newCustomerRoles.Any() && newCustomerRoles.FirstOrDefault(c => c.SystemName == NopCustomerDefaults.RegisteredRoleName) != null)
             {
                 var customerAttributeWarnings = _customerAttributeParser.GetAttributeWarnings(customerAttributesXml);
                 foreach (var error in customerAttributeWarnings)
@@ -350,36 +355,36 @@ namespace Nop.Web.Areas.Admin.Controllers
 
                 //form fields
                 if (_dateTimeSettings.AllowCustomersToSetTimeZone)
-                    _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.TimeZoneId, model.TimeZoneId);
+                    _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.TimeZoneIdAttribute, model.TimeZoneId);
                 if (_customerSettings.GenderEnabled)
-                    _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.Gender, model.Gender);
-                _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.FirstName, model.FirstName);
-                _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.LastName, model.LastName);
+                    _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.GenderAttribute, model.Gender);
+                _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.FirstNameAttribute, model.FirstName);
+                _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.LastNameAttribute, model.LastName);
                 if (_customerSettings.DateOfBirthEnabled)
-                    _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.DateOfBirth, model.DateOfBirth);
+                    _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.DateOfBirthAttribute, model.DateOfBirth);
                 if (_customerSettings.CompanyEnabled)
-                    _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.Company, model.Company);
+                    _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.CompanyAttribute, model.Company);
                 if (_customerSettings.StreetAddressEnabled)
-                    _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.StreetAddress, model.StreetAddress);
+                    _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.StreetAddressAttribute, model.StreetAddress);
                 if (_customerSettings.StreetAddress2Enabled)
-                    _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.StreetAddress2, model.StreetAddress2);
+                    _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.StreetAddress2Attribute, model.StreetAddress2);
                 if (_customerSettings.ZipPostalCodeEnabled)
-                    _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.ZipPostalCode, model.ZipPostalCode);
+                    _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.ZipPostalCodeAttribute, model.ZipPostalCode);
                 if (_customerSettings.CityEnabled)
-                    _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.City, model.City);
+                    _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.CityAttribute, model.City);
                 if (_customerSettings.CountyEnabled)
-                    _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.County, model.County);
+                    _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.CountyAttribute, model.County);
                 if (_customerSettings.CountryEnabled)
-                    _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.CountryId, model.CountryId);
+                    _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.CountryIdAttribute, model.CountryId);
                 if (_customerSettings.CountryEnabled && _customerSettings.StateProvinceEnabled)
-                    _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.StateProvinceId, model.StateProvinceId);
+                    _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.StateProvinceIdAttribute, model.StateProvinceId);
                 if (_customerSettings.PhoneEnabled)
-                    _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.Phone, model.Phone);
+                    _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.PhoneAttribute, model.Phone);
                 if (_customerSettings.FaxEnabled)
-                    _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.Fax, model.Fax);
+                    _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.FaxAttribute, model.Fax);
 
                 //custom customer attributes
-                _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.CustomCustomerAttributes, customerAttributesXml);
+                _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.CustomCustomerAttributes, customerAttributesXml);
 
                 //newsletter subscriptions
                 if (!string.IsNullOrEmpty(customer.Email))
@@ -432,10 +437,10 @@ namespace Nop.Web.Areas.Admin.Controllers
                 foreach (var customerRole in newCustomerRoles)
                 {
                     //ensure that the current customer cannot add to "Administrators" system role if he's not an admin himself
-                    if (customerRole.SystemName == SystemCustomerRoleNames.Administrators && !_workContext.CurrentCustomer.IsAdmin())
+                    if (customerRole.SystemName == NopCustomerDefaults.AdministratorsRoleName && !_workContext.CurrentCustomer.IsAdmin())
                         continue;
 
-                    customer.CustomerRoles.Add(customerRole);
+                    customer.CustomerCustomerRoleMappings.Add(new CustomerCustomerRoleMapping { CustomerRole = customerRole });
                 }
 
                 _customerService.UpdateCustomer(customer);
@@ -455,8 +460,10 @@ namespace Nop.Web.Areas.Admin.Controllers
                 {
                     var vendorRole = customer
                         .CustomerRoles
-                        .FirstOrDefault(x => x.SystemName == SystemCustomerRoleNames.Vendors);
-                    customer.CustomerRoles.Remove(vendorRole);
+                        .FirstOrDefault(x => x.SystemName == NopCustomerDefaults.VendorsRoleName);
+                    //customer.CustomerRoles.Remove(vendorRole);
+                    customer.CustomerCustomerRoleMappings
+                        .Remove(customer.CustomerCustomerRoleMappings.FirstOrDefault(mapping => mapping.CustomerRoleId == vendorRole.Id));
                     _customerService.UpdateCustomer(customer);
                     ErrorNotification(_localizationService.GetResource("Admin.Customers.Customers.CannotBeInVendoRoleWithoutVendorAssociated"));
                 }
@@ -525,7 +532,7 @@ namespace Nop.Web.Areas.Admin.Controllers
             }
 
             // Ensure that valid email address is entered if Registered role is checked to avoid registered customers with empty email address
-            if (newCustomerRoles.Any() && newCustomerRoles.FirstOrDefault(c => c.SystemName == SystemCustomerRoleNames.Registered) != null &&
+            if (newCustomerRoles.Any() && newCustomerRoles.FirstOrDefault(c => c.SystemName == NopCustomerDefaults.RegisteredRoleName) != null &&
                 !CommonHelper.IsValidEmail(model.Email))
             {
                 ModelState.AddModelError(string.Empty, _localizationService.GetResource("Admin.Customers.Customers.ValidEmailRequiredRegisteredRole"));
@@ -534,7 +541,7 @@ namespace Nop.Web.Areas.Admin.Controllers
 
             //custom customer attributes
             var customerAttributesXml = ParseCustomCustomerAttributes(model.Form);
-            if (newCustomerRoles.Any() && newCustomerRoles.FirstOrDefault(c => c.SystemName == SystemCustomerRoleNames.Registered) != null)
+            if (newCustomerRoles.Any() && newCustomerRoles.FirstOrDefault(c => c.SystemName == NopCustomerDefaults.RegisteredRoleName) != null)
             {
                 var customerAttributeWarnings = _customerAttributeParser.GetAttributeWarnings(customerAttributesXml);
                 foreach (var error in customerAttributeWarnings)
@@ -574,23 +581,23 @@ namespace Nop.Web.Areas.Admin.Controllers
                     //VAT number
                     if (_taxSettings.EuVatEnabled)
                     {
-                        var prevVatNumber = customer.GetAttribute<string>(SystemCustomerAttributeNames.VatNumber);
+                        var prevVatNumber = _genericAttributeService.GetAttribute<string>(customer, NopCustomerDefaults.VatNumberAttribute);
 
-                        _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.VatNumber, model.VatNumber);
+                        _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.VatNumberAttribute, model.VatNumber);
                         //set VAT number status
                         if (!string.IsNullOrEmpty(model.VatNumber))
                         {
                             if (!model.VatNumber.Equals(prevVatNumber, StringComparison.InvariantCultureIgnoreCase))
                             {
                                 _genericAttributeService.SaveAttribute(customer,
-                                    SystemCustomerAttributeNames.VatNumberStatusId,
+                                    NopCustomerDefaults.VatNumberStatusIdAttribute,
                                     (int)_taxService.GetVatNumberStatus(model.VatNumber));
                             }
                         }
                         else
                         {
                             _genericAttributeService.SaveAttribute(customer,
-                                SystemCustomerAttributeNames.VatNumberStatusId,
+                                NopCustomerDefaults.VatNumberStatusIdAttribute,
                                 (int)VatNumberStatus.Empty);
                         }
                     }
@@ -600,36 +607,36 @@ namespace Nop.Web.Areas.Admin.Controllers
 
                     //form fields
                     if (_dateTimeSettings.AllowCustomersToSetTimeZone)
-                        _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.TimeZoneId, model.TimeZoneId);
+                        _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.TimeZoneIdAttribute, model.TimeZoneId);
                     if (_customerSettings.GenderEnabled)
-                        _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.Gender, model.Gender);
-                    _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.FirstName, model.FirstName);
-                    _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.LastName, model.LastName);
+                        _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.GenderAttribute, model.Gender);
+                    _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.FirstNameAttribute, model.FirstName);
+                    _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.LastNameAttribute, model.LastName);
                     if (_customerSettings.DateOfBirthEnabled)
-                        _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.DateOfBirth, model.DateOfBirth);
+                        _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.DateOfBirthAttribute, model.DateOfBirth);
                     if (_customerSettings.CompanyEnabled)
-                        _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.Company, model.Company);
+                        _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.CompanyAttribute, model.Company);
                     if (_customerSettings.StreetAddressEnabled)
-                        _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.StreetAddress, model.StreetAddress);
+                        _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.StreetAddressAttribute, model.StreetAddress);
                     if (_customerSettings.StreetAddress2Enabled)
-                        _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.StreetAddress2, model.StreetAddress2);
+                        _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.StreetAddress2Attribute, model.StreetAddress2);
                     if (_customerSettings.ZipPostalCodeEnabled)
-                        _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.ZipPostalCode, model.ZipPostalCode);
+                        _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.ZipPostalCodeAttribute, model.ZipPostalCode);
                     if (_customerSettings.CityEnabled)
-                        _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.City, model.City);
+                        _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.CityAttribute, model.City);
                     if (_customerSettings.CountyEnabled)
-                        _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.County, model.County);
+                        _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.CountyAttribute, model.County);
                     if (_customerSettings.CountryEnabled)
-                        _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.CountryId, model.CountryId);
+                        _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.CountryIdAttribute, model.CountryId);
                     if (_customerSettings.CountryEnabled && _customerSettings.StateProvinceEnabled)
-                        _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.StateProvinceId, model.StateProvinceId);
+                        _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.StateProvinceIdAttribute, model.StateProvinceId);
                     if (_customerSettings.PhoneEnabled)
-                        _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.Phone, model.Phone);
+                        _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.PhoneAttribute, model.Phone);
                     if (_customerSettings.FaxEnabled)
-                        _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.Fax, model.Fax);
+                        _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.FaxAttribute, model.Fax);
 
                     //custom customer attributes
-                    _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.CustomCustomerAttributes, customerAttributesXml);
+                    _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.CustomCustomerAttributes, customerAttributesXml);
 
                     //newsletter subscriptions
                     if (!string.IsNullOrEmpty(customer.Email))
@@ -671,28 +678,31 @@ namespace Nop.Web.Areas.Admin.Controllers
                     {
                         //ensure that the current customer cannot add/remove to/from "Administrators" system role
                         //if he's not an admin himself
-                        if (customerRole.SystemName == SystemCustomerRoleNames.Administrators &&
+                        if (customerRole.SystemName == NopCustomerDefaults.AdministratorsRoleName &&
                             !_workContext.CurrentCustomer.IsAdmin())
                             continue;
 
                         if (model.SelectedCustomerRoleIds.Contains(customerRole.Id))
                         {
                             //new role
-                            if (customer.CustomerRoles.Count(cr => cr.Id == customerRole.Id) == 0)
-                                customer.CustomerRoles.Add(customerRole);
+                            if (customer.CustomerCustomerRoleMappings.Count(mapping => mapping.CustomerRoleId == customerRole.Id) == 0)
+                                customer.CustomerCustomerRoleMappings.Add(new CustomerCustomerRoleMapping { CustomerRole = customerRole });
                         }
                         else
                         {
                             //prevent attempts to delete the administrator role from the user, if the user is the last active administrator
-                            if (customerRole.SystemName == SystemCustomerRoleNames.Administrators && !SecondAdminAccountExists(customer))
+                            if (customerRole.SystemName == NopCustomerDefaults.AdministratorsRoleName && !SecondAdminAccountExists(customer))
                             {
                                 ErrorNotification(_localizationService.GetResource("Admin.Customers.Customers.AdminAccountShouldExists.DeleteRole"));
                                 continue;
                             }
 
                             //remove role
-                            if (customer.CustomerRoles.Count(cr => cr.Id == customerRole.Id) > 0)
-                                customer.CustomerRoles.Remove(customerRole);
+                            if (customer.CustomerCustomerRoleMappings.Count(mapping => mapping.CustomerRoleId == customerRole.Id) > 0)
+                            {
+                                customer.CustomerCustomerRoleMappings
+                                    .Remove(customer.CustomerCustomerRoleMappings.FirstOrDefault(mapping => mapping.CustomerRoleId == customerRole.Id));
+                            }
                         }
                     }
 
@@ -713,8 +723,10 @@ namespace Nop.Web.Areas.Admin.Controllers
                     {
                         var vendorRole = customer
                             .CustomerRoles
-                            .FirstOrDefault(x => x.SystemName == SystemCustomerRoleNames.Vendors);
-                        customer.CustomerRoles.Remove(vendorRole);
+                            .FirstOrDefault(x => x.SystemName == NopCustomerDefaults.VendorsRoleName);
+                        //customer.CustomerRoles.Remove(vendorRole);
+                        customer.CustomerCustomerRoleMappings
+                            .Remove(customer.CustomerCustomerRoleMappings.FirstOrDefault(mapping => mapping.CustomerRoleId == vendorRole.Id));
                         _customerService.UpdateCustomer(customer);
                         ErrorNotification(_localizationService.GetResource("Admin.Customers.Customers.CannotBeInVendoRoleWithoutVendorAssociated"));
                     }
@@ -793,7 +805,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                 return RedirectToAction("List");
 
             _genericAttributeService.SaveAttribute(customer,
-                SystemCustomerAttributeNames.VatNumberStatusId,
+                NopCustomerDefaults.VatNumberStatusIdAttribute,
                 (int)VatNumberStatus.Valid);
 
             return RedirectToAction("Edit", new { id = customer.Id });
@@ -812,7 +824,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                 return RedirectToAction("List");
 
             _genericAttributeService.SaveAttribute(customer,
-                SystemCustomerAttributeNames.VatNumberStatusId,
+                NopCustomerDefaults.VatNumberStatusIdAttribute,
                 (int)VatNumberStatus.Invalid);
 
             return RedirectToAction("Edit", new { id = customer.Id });
@@ -918,7 +930,7 @@ namespace Nop.Web.Areas.Admin.Controllers
             //ensure login is not required
             customer.RequireReLogin = false;
             _customerService.UpdateCustomer(customer);
-            _genericAttributeService.SaveAttribute<int?>(_workContext.CurrentCustomer, SystemCustomerAttributeNames.ImpersonatedCustomerId, customer.Id);
+            _genericAttributeService.SaveAttribute<int?>(_workContext.CurrentCustomer, NopCustomerDefaults.ImpersonatedCustomerIdAttribute, customer.Id);
 
             return RedirectToAction("Index", "Home", new { area = string.Empty });
         }
@@ -955,7 +967,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                 return RedirectToAction("List");
 
             //email validation message
-            _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.AccountActivationToken, Guid.NewGuid().ToString());
+            _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.AccountActivationTokenAttribute, Guid.NewGuid().ToString());
             _workflowMessageService.SendCustomerEmailValidationMessage(customer, _workContext.WorkingLanguage.Id);
 
             SuccessNotification(_localizationService.GetResource("Admin.Customers.Customers.ReSendActivationMessage.Success"));
@@ -995,7 +1007,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                     EmailAccountId = emailAccount.Id,
                     FromName = emailAccount.DisplayName,
                     From = emailAccount.Email,
-                    ToName = customer.GetFullName(),
+                    ToName = _customerService.GetCustomerFullName(customer),
                     To = customer.Email,
                     Subject = model.SendEmail.Subject,
                     Body = model.SendEmail.Body,
@@ -1151,7 +1163,7 @@ namespace Nop.Web.Areas.Admin.Controllers
             if (address == null)
                 return Content("No address found with the specified id");
 
-            customer.RemoveAddress(address);
+            _customerService.RemoveCustomerAddress(customer, address);
             _customerService.UpdateCustomer(customer);
 
             //now delete the address record
@@ -1188,7 +1200,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                 return RedirectToAction("List");
 
             //custom address attributes
-            var customAttributes = model.Form.ParseCustomAddressAttributes(_addressAttributeParser, _addressAttributeService);
+            var customAttributes = _addressAttributeParser.ParseCustomAddressAttributes(model.Form);
             var customAttributeWarnings = _addressAttributeParser.GetAttributeWarnings(customAttributes);
             foreach (var error in customAttributeWarnings)
             {
@@ -1197,7 +1209,7 @@ namespace Nop.Web.Areas.Admin.Controllers
 
             if (ModelState.IsValid)
             {
-                var address = model.Address.ToEntity();
+                var address = model.Address.ToEntity<Address>();
                 address.CustomAttributes = customAttributes;
                 address.CreatedOnUtc = DateTime.UtcNow;
 
@@ -1206,7 +1218,8 @@ namespace Nop.Web.Areas.Admin.Controllers
                     address.CountryId = null;
                 if (address.StateProvinceId == 0)
                     address.StateProvinceId = null;
-                customer.Addresses.Add(address);
+                //customer.Addresses.Add(address);
+                customer.CustomerAddressMappings.Add(new CustomerAddressMapping { Address = address });
                 _customerService.UpdateCustomer(customer);
 
                 SuccessNotification(_localizationService.GetResource("Admin.Customers.Customers.Addresses.Added"));
@@ -1259,7 +1272,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                 return RedirectToAction("Edit", new { id = customer.Id });
 
             //custom address attributes
-            var customAttributes = model.Form.ParseCustomAddressAttributes(_addressAttributeParser, _addressAttributeService);
+            var customAttributes = _addressAttributeParser.ParseCustomAddressAttributes(model.Form);
             var customAttributeWarnings = _addressAttributeParser.GetAttributeWarnings(customAttributes);
             foreach (var error in customAttributeWarnings)
             {
@@ -1306,54 +1319,7 @@ namespace Nop.Web.Areas.Admin.Controllers
 
         #endregion
 
-        #region Reports
-
-        public virtual IActionResult Reports()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCustomers))
-                return AccessDeniedView();
-
-            //prepare model
-            var model = _customerModelFactory.PrepareCustomerReportsSearchModel(new CustomerReportsSearchModel());
-
-            return View(model);
-        }
-
-        [HttpPost]
-        public virtual IActionResult ReportBestCustomersByOrderTotalList(BestCustomersReportSearchModel searchModel)
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCustomers))
-                return AccessDeniedKendoGridJson();
-
-            //prepare model
-            var model = _customerModelFactory.PrepareBestCustomersReportListModel(searchModel);
-
-            return Json(model);
-        }
-
-        [HttpPost]
-        public virtual IActionResult ReportBestCustomersByNumberOfOrdersList(BestCustomersReportSearchModel searchModel)
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCustomers))
-                return AccessDeniedKendoGridJson();
-
-            //prepare model
-            var model = _customerModelFactory.PrepareBestCustomersReportListModel(searchModel);
-
-            return Json(model);
-        }
-
-        [HttpPost]
-        public virtual IActionResult ReportRegisteredCustomersList(RegisteredCustomersReportSearchModel searchModel)
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCustomers))
-                return AccessDeniedKendoGridJson();
-
-            //prepare model
-            var model = _customerModelFactory.PrepareRegisteredCustomersReportListModel(searchModel);
-
-            return Json(model);
-        }
+        #region Customer
 
         public virtual IActionResult LoadCustomerStatistics(string period)
         {
@@ -1364,7 +1330,7 @@ namespace Nop.Web.Areas.Admin.Controllers
 
             var nowDt = _dateTimeHelper.ConvertToUserTime(DateTime.Now);
             var timeZone = _dateTimeHelper.CurrentTimeZone;
-            var searchCustomerRoleIds = new[] { _customerService.GetCustomerRoleBySystemName(SystemCustomerRoleNames.Registered).Id };
+            var searchCustomerRoleIds = new[] { _customerService.GetCustomerRoleBySystemName(NopCustomerDefaults.RegisteredRoleName).Id };
 
             var culture = new CultureInfo(_workContext.WorkingLanguage.LanguageCulture);
 
@@ -1499,6 +1465,107 @@ namespace Nop.Web.Areas.Admin.Controllers
             return Json(model);
         }
 
+        #endregion
+
+        #region GDPR
+
+        public virtual IActionResult GdprLog()
+        {
+            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCustomers))
+                return AccessDeniedView();
+
+            //prepare model
+            var model = _customerModelFactory.PrepareGdprLogSearchModel(new GdprLogSearchModel());
+
+            return View(model);
+        }
+
+        [HttpPost]
+        public virtual IActionResult GdprLogList(GdprLogSearchModel searchModel)
+        {
+            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCustomers))
+                return AccessDeniedKendoGridJson();
+
+            //prepare model
+            var model = _customerModelFactory.PrepareGdprLogListModel(searchModel);
+
+            return Json(model);
+        }
+
+        [HttpPost]
+        public virtual IActionResult GdprDelete(int id)
+        {
+            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCustomers))
+                return AccessDeniedView();
+
+            //try to get a customer with the specified id
+            var customer = _customerService.GetCustomerById(id);
+            if (customer == null)
+                return RedirectToAction("List");
+
+            if (!_gdprSettings.GdprEnabled)
+                return RedirectToAction("List");
+
+            try
+            {
+                //prevent attempts to delete the user, if it is the last active administrator
+                if (customer.IsAdmin() && !SecondAdminAccountExists(customer))
+                {
+                    ErrorNotification(_localizationService.GetResource("Admin.Customers.Customers.AdminAccountShouldExists.DeleteAdministrator"));
+                    return RedirectToAction("Edit", new { id = customer.Id });
+                }
+
+                //ensure that the current customer cannot delete "Administrators" if he's not an admin himself
+                if (customer.IsAdmin() && !_workContext.CurrentCustomer.IsAdmin())
+                {
+                    ErrorNotification(_localizationService.GetResource("Admin.Customers.Customers.OnlyAdminCanDeleteAdmin"));
+                    return RedirectToAction("Edit", new { id = customer.Id });
+                }
+
+                //delete
+                _gdprService.PermanentDeleteCustomer(customer);
+
+                //activity log
+                _customerActivityService.InsertActivity("DeleteCustomer",
+                    string.Format(_localizationService.GetResource("ActivityLog.DeleteCustomer"), customer.Id), customer);
+
+                SuccessNotification(_localizationService.GetResource("Admin.Customers.Customers.Deleted"));
+
+                return RedirectToAction("List");
+            }
+            catch (Exception exc)
+            {
+                ErrorNotification(exc.Message);
+                return RedirectToAction("Edit", new { id = customer.Id });
+            }
+        }
+
+        public virtual IActionResult GdprExport(int id)
+        {
+            if (!_permissionService.Authorize(StandardPermissionProvider.ManageCustomers))
+                return AccessDeniedView();
+
+            //try to get a customer with the specified id
+            var customer = _customerService.GetCustomerById(id);
+            if (customer == null)
+                return RedirectToAction("List");
+
+            try
+            {
+                //log
+                //_gdprService.InsertLog(customer, 0, GdprRequestType.ExportData, _localizationService.GetResource("Gdpr.Exported"));
+                //export
+                //export
+                var bytes = _exportManager.ExportCustomerGdprInfoToXlsx(_workContext.CurrentCustomer, _storeContext.CurrentStore.Id);
+
+                return File(bytes, MimeTypes.TextXlsx, $"customerdata-{customer.Id}.xlsx");
+            }
+            catch (Exception exc)
+            {
+                ErrorNotification(exc);
+                return RedirectToAction("Edit", new { id = customer.Id });
+            }
+        }
         #endregion
 
         #region Export / Import

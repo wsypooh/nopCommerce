@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
+using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Shipping;
 using Nop.Core.Plugins;
 using Nop.Services.Common;
@@ -14,8 +15,8 @@ using Nop.Services.Plugins;
 using Nop.Services.Security;
 using Nop.Services.Shipping;
 using Nop.Services.Shipping.Date;
-using Nop.Web.Areas.Admin.Extensions;
 using Nop.Web.Areas.Admin.Factories;
+using Nop.Web.Areas.Admin.Infrastructure.Mapper.Extensions;
 using Nop.Web.Areas.Admin.Models.Shipping;
 using Nop.Web.Framework.Mvc;
 using Nop.Web.Framework.Mvc.Filters;
@@ -133,7 +134,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                 return AccessDeniedView();
 
             var srcm = _shippingService.LoadShippingRateComputationMethodBySystemName(model.SystemName);
-            if (srcm.IsShippingRateComputationMethodActive(_shippingSettings))
+            if (_shippingService.IsShippingRateComputationMethodActive(srcm))
             {
                 if (!model.IsActive)
                 {
@@ -200,7 +201,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                 return AccessDeniedView();
 
             var pickupPointProvider = _shippingService.LoadPickupPointProviderBySystemName(model.SystemName);
-            if (pickupPointProvider.IsPickupPointProviderActive(_shippingSettings))
+            if (_shippingService.IsPickupPointProviderActive(pickupPointProvider))
             {
                 if (!model.IsActive)
                 {
@@ -277,7 +278,7 @@ namespace Nop.Web.Areas.Admin.Controllers
 
             if (ModelState.IsValid)
             {
-                var sm = model.ToEntity();
+                var sm = model.ToEntity<ShippingMethod>();
                 _shippingService.InsertShippingMethod(sm);
 
                 //locales
@@ -336,7 +337,7 @@ namespace Nop.Web.Areas.Admin.Controllers
 
             //prepare model
             model = _shippingModelFactory.PrepareShippingMethodModel(model, shippingMethod, true);
-            
+
             //if we got this far, something failed, redisplay form
             return View(model);
         }
@@ -409,7 +410,7 @@ namespace Nop.Web.Areas.Admin.Controllers
 
             if (ModelState.IsValid)
             {
-                var deliveryDate = model.ToEntity();
+                var deliveryDate = model.ToEntity<DeliveryDate>();
                 _dateRangeService.InsertDeliveryDate(deliveryDate);
 
                 //locales
@@ -527,7 +528,7 @@ namespace Nop.Web.Areas.Admin.Controllers
 
             if (ModelState.IsValid)
             {
-                var productAvailabilityRange = model.ToEntity();
+                var productAvailabilityRange = model.ToEntity<ProductAvailabilityRange>();
                 _dateRangeService.InsertProductAvailabilityRange(productAvailabilityRange);
 
                 //locales
@@ -656,7 +657,7 @@ namespace Nop.Web.Areas.Admin.Controllers
 
             if (ModelState.IsValid)
             {
-                var address = model.Address.ToEntity();
+                var address = model.Address.ToEntity<Address>();
                 address.CreatedOnUtc = DateTime.UtcNow;
                 _addressService.InsertAddress(address);
 
@@ -715,7 +716,7 @@ namespace Nop.Web.Areas.Admin.Controllers
             if (ModelState.IsValid)
             {
                 var address = _addressService.GetAddressById(warehouse.AddressId) ??
-                    new Core.Domain.Common.Address
+                    new Address
                     {
                         CreatedOnUtc = DateTime.UtcNow
                     };
@@ -784,6 +785,10 @@ namespace Nop.Web.Areas.Admin.Controllers
             return View(model);
         }
 
+        //we ignore this filter for increase RequestFormLimits
+        [AdminAntiForgery(true)]
+        //we use 2048 value because in some cases default value (1024) is too small for this action
+        [RequestFormLimits(ValueCountLimit = 2048)]
         [HttpPost, ActionName("Restrictions")]
         public virtual IActionResult RestrictionSave(ShippingMethodRestrictionModel model)
         {
@@ -807,17 +812,19 @@ namespace Nop.Web.Areas.Admin.Controllers
                     var restrict = countryIdsToRestrict.Contains(country.Id);
                     if (restrict)
                     {
-                        if (shippingMethod.RestrictedCountries.FirstOrDefault(c => c.Id == country.Id) != null)
+                        if (shippingMethod.ShippingMethodCountryMappings.FirstOrDefault(mapping => mapping.CountryId == country.Id) != null)
                             continue;
 
-                        shippingMethod.RestrictedCountries.Add(country);
+                        shippingMethod.ShippingMethodCountryMappings.Add(new ShippingMethodCountryMapping { Country = country });
                         _shippingService.UpdateShippingMethod(shippingMethod);
                     }
                     else
                     {
-                        if (shippingMethod.RestrictedCountries.FirstOrDefault(c => c.Id == country.Id) == null)
+                        if (shippingMethod.ShippingMethodCountryMappings.FirstOrDefault(mapping => mapping.CountryId == country.Id) == null)
                             continue;
-                        shippingMethod.RestrictedCountries.Remove(country);
+
+                        shippingMethod.ShippingMethodCountryMappings
+                            .Remove(shippingMethod.ShippingMethodCountryMappings.FirstOrDefault(mapping => mapping.CountryId == country.Id));
                         _shippingService.UpdateShippingMethod(shippingMethod);
                     }
                 }

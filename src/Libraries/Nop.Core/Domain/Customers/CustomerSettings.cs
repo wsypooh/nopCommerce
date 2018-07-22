@@ -188,6 +188,11 @@ namespace Nop.Core.Domain.Customers
         public bool RequireRegistrationForDownloadableProducts { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether to check gift card balance
+        /// </summary>
+        public bool AllowCustomersToCheckGiftCardBalance { get; set; }
+
+        /// <summary>
         /// Gets or sets interval (in minutes) with which the Delete Guest Task runs
         /// </summary>
         public int DeleteGuestTaskOlderThanMinutes { get; set; }
@@ -308,6 +313,7 @@ namespace Nop.Core.Domain.Customers
         /// Gets or sets a value indicating whether 'Fax number' is enabled
         /// </summary>
         public bool FaxEnabled { get; set; }
+
         /// <summary>
         /// Gets or sets a value indicating whether 'Fax number' is required
         /// </summary>

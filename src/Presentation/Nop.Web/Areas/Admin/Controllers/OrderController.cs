@@ -23,10 +23,10 @@ using Nop.Services.Orders;
 using Nop.Services.Payments;
 using Nop.Services.Security;
 using Nop.Services.Shipping;
-using Nop.Web.Areas.Admin.Extensions;
 using Nop.Web.Areas.Admin.Factories;
+using Nop.Web.Areas.Admin.Infrastructure.Mapper.Extensions;
 using Nop.Web.Areas.Admin.Models.Orders;
-using Nop.Web.Extensions;
+using Nop.Web.Areas.Admin.Models.Reports;
 using Nop.Web.Framework.Controllers;
 using Nop.Web.Framework.Kendoui;
 using Nop.Web.Framework.Mvc;
@@ -39,7 +39,6 @@ namespace Nop.Web.Areas.Admin.Controllers
         #region Fields
 
         private readonly IAddressAttributeParser _addressAttributeParser;
-        private readonly IAddressAttributeService _addressAttributeService;
         private readonly IAddressService _addressService;
         private readonly ICustomerActivityService _customerActivityService;
         private readonly IDateTimeHelper _dateTimeHelper;
@@ -71,7 +70,6 @@ namespace Nop.Web.Areas.Admin.Controllers
         #region Ctor
 
         public OrderController(IAddressAttributeParser addressAttributeParser,
-            IAddressAttributeService addressAttributeService,
             IAddressService addressService,
             ICustomerActivityService customerActivityService,
             IDateTimeHelper dateTimeHelper,
@@ -99,7 +97,6 @@ namespace Nop.Web.Areas.Admin.Controllers
             OrderSettings orderSettings)
         {
             this._addressAttributeParser = addressAttributeParser;
-            this._addressAttributeService = addressAttributeService;
             this._addressService = addressService;
             this._customerActivityService = customerActivityService;
             this._dateTimeHelper = dateTimeHelper;
@@ -420,7 +417,7 @@ namespace Nop.Web.Areas.Admin.Controllers
             return RedirectToAction("List");
         }
 
-        public virtual IActionResult List(List<int> orderStatusIds = null, List<int> paymentStatusIds = null, List<int> shippingStatusIds = null)
+        public virtual IActionResult List(List<int> orderStatuses = null, List<int> paymentStatuses = null, List<int> shippingStatuses = null)
         {
             if (!_permissionService.Authorize(StandardPermissionProvider.ManageOrders))
                 return AccessDeniedView();
@@ -428,9 +425,9 @@ namespace Nop.Web.Areas.Admin.Controllers
             //prepare model
             var model = _orderModelFactory.PrepareOrderSearchModel(new OrderSearchModel
             {
-                OrderStatusIds = orderStatusIds,
-                PaymentStatusIds = paymentStatusIds,
-                ShippingStatusIds = shippingStatusIds
+                OrderStatusIds = orderStatuses,
+                PaymentStatusIds = paymentStatuses,
+                ShippingStatusIds = shippingStatuses
             });
 
             return View(model);
@@ -1056,7 +1053,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                 //add a note
                 order.OrderNotes.Add(new OrderNote
                 {
-                    Note = $"Order status has been edited. New status: {order.OrderStatus.GetLocalizedEnum(_localizationService, _workContext)}",
+                    Note = $"Order status has been edited. New status: {_localizationService.GetLocalizedEnum(order.OrderStatus)}",
                     DisplayToCustomer = false,
                     CreatedOnUtc = DateTime.UtcNow
                 });
@@ -1878,7 +1875,7 @@ namespace Nop.Web.Areas.Admin.Controllers
 
             //gift cards
             attributesXml = AddGiftCards(form, product, attributesXml, out var recipientName, out var recipientEmail, out var senderName, out var senderEmail, out var giftCardMessage);
-            
+
             //rental product
             DateTime? rentalStartDate = null;
             DateTime? rentalEndDate = null;
@@ -2042,7 +2039,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                 ?? throw new ArgumentException("No address found with the specified id");
 
             //custom address attributes
-            var customAttributes = model.Form.ParseCustomAddressAttributes(_addressAttributeParser, _addressAttributeService);
+            var customAttributes = _addressAttributeParser.ParseCustomAddressAttributes(model.Form);
             var customAttributeWarnings = _addressAttributeParser.GetAttributeWarnings(customAttributes);
             foreach (var error in customAttributeWarnings)
             {
@@ -2067,7 +2064,7 @@ namespace Nop.Web.Areas.Admin.Controllers
 
                 return RedirectToAction("AddressEdit", new { addressId = model.Address.Id, orderId = model.OrderId });
             }
-            
+
             //prepare model
             model = _orderModelFactory.PrepareOrderAddressModel(model, order, address);
 
@@ -2202,7 +2199,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                     continue;
 
                 //ensure that this product can be shipped (have at least one item to ship)
-                var maxQtyToAdd = orderItem.GetTotalNumberOfItemsCanBeAddedToShipment();
+                var maxQtyToAdd = _orderService.GetTotalNumberOfItemsCanBeAddedToShipment(orderItem);
                 if (maxQtyToAdd <= 0)
                     continue;
 
@@ -2835,52 +2832,6 @@ namespace Nop.Web.Areas.Admin.Controllers
             return Json(model);
         }
 
-        public virtual IActionResult BestsellersReport()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageOrders))
-                return AccessDeniedView();
-
-            //prepare model
-            var model = _orderModelFactory.PrepareBestsellerSearchModel(new BestsellerSearchModel());
-
-            return View(model);
-        }
-
-        [HttpPost]
-        public virtual IActionResult BestsellersReportList(BestsellerSearchModel searchModel)
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageOrders))
-                return AccessDeniedKendoGridJson();
-
-            //prepare model
-            var model = _orderModelFactory.PrepareBestsellerListModel(searchModel);
-
-            return Json(model);
-        }
-
-        public virtual IActionResult NeverSoldReport()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageOrders))
-                return AccessDeniedView();
-
-            //prepare model
-            var model = _orderModelFactory.PrepareNeverSoldReportSearchModel(new NeverSoldReportSearchModel());
-
-            return View(model);
-        }
-
-        [HttpPost]
-        public virtual IActionResult NeverSoldReportList(NeverSoldReportSearchModel searchModel)
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageOrders))
-                return AccessDeniedKendoGridJson();
-
-            //prepare model
-            var model = _orderModelFactory.PrepareNeverSoldReportListModel(searchModel);
-
-            return Json(model);
-        }
-
         [HttpPost]
         public virtual IActionResult OrderAverageReportList(DataSourceRequest command)
         {
@@ -2909,29 +2860,6 @@ namespace Nop.Web.Areas.Admin.Controllers
 
             //prepare model
             var model = _orderModelFactory.PrepareOrderIncompleteReportListModel();
-
-            return Json(model);
-        }
-
-        public virtual IActionResult CountryReport()
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.OrderCountryReport))
-                return AccessDeniedView();
-
-            //prepare model
-            var model = _orderModelFactory.PrepareCountryReportSearchModel(new CountryReportSearchModel());
-
-            return View(model);
-        }
-
-        [HttpPost]
-        public virtual IActionResult CountryReportList(CountryReportSearchModel searchModel)
-        {
-            if (!_permissionService.Authorize(StandardPermissionProvider.OrderCountryReport))
-                return AccessDeniedKendoGridJson();
-
-            //prepare model
-            var model = _orderModelFactory.PrepareCountryReportListModel(searchModel);
 
             return Json(model);
         }

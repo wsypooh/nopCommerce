@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
 using Nop.Core.Domain.Catalog;
+using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Vendors;
 using Nop.Services.Common;
 using Nop.Services.Customers;
@@ -13,8 +14,8 @@ using Nop.Services.Media;
 using Nop.Services.Security;
 using Nop.Services.Seo;
 using Nop.Services.Vendors;
-using Nop.Web.Areas.Admin.Extensions;
 using Nop.Web.Areas.Admin.Factories;
+using Nop.Web.Areas.Admin.Infrastructure.Mapper.Extensions;
 using Nop.Web.Areas.Admin.Models.Vendors;
 using Nop.Web.Framework.Controllers;
 using Nop.Web.Framework.Mvc;
@@ -114,7 +115,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                     localized.LanguageId);
 
                 //search engine name
-                var seName = vendor.ValidateSeName(localized.SeName, localized.Name, false);
+                var seName = _urlRecordService.ValidateSeName(vendor, localized.SeName, localized.Name, false);
                 _urlRecordService.SaveSlug(vendor, seName, localized.LanguageId);
             }
         }
@@ -252,7 +253,7 @@ namespace Nop.Web.Areas.Admin.Controllers
 
             if (ModelState.IsValid)
             {
-                var vendor = model.ToEntity();
+                var vendor = model.ToEntity<Vendor>();
                 _vendorService.InsertVendor(vendor);
 
                 //activity log
@@ -260,11 +261,11 @@ namespace Nop.Web.Areas.Admin.Controllers
                     string.Format(_localizationService.GetResource("ActivityLog.AddNewVendor"), vendor.Id), vendor);
 
                 //search engine name
-                model.SeName = vendor.ValidateSeName(model.SeName, vendor.Name, true);
+                model.SeName = _urlRecordService.ValidateSeName(vendor, model.SeName, vendor.Name, true);
                 _urlRecordService.SaveSlug(vendor, model.SeName, 0);
 
                 //address
-                var address = model.Address.ToEntity();
+                var address = model.Address.ToEntity<Address>();
                 address.CreatedOnUtc = DateTime.UtcNow;
 
                 //some validation
@@ -277,7 +278,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                 _vendorService.UpdateVendor(vendor);
 
                 //vendor attributes
-                _genericAttributeService.SaveAttribute(vendor, VendorAttributeNames.VendorAttributes, vendorAttributesXml);
+                _genericAttributeService.SaveAttribute(vendor, NopVendorDefaults.VendorAttributes, vendorAttributesXml);
 
                 //locales
                 UpdateLocales(vendor, model);
@@ -342,21 +343,21 @@ namespace Nop.Web.Areas.Admin.Controllers
                 _vendorService.UpdateVendor(vendor);
 
                 //vendor attributes
-                _genericAttributeService.SaveAttribute(vendor, VendorAttributeNames.VendorAttributes, vendorAttributesXml);
+                _genericAttributeService.SaveAttribute(vendor, NopVendorDefaults.VendorAttributes, vendorAttributesXml);
 
                 //activity log
                 _customerActivityService.InsertActivity("EditVendor",
                     string.Format(_localizationService.GetResource("ActivityLog.EditVendor"), vendor.Id), vendor);
 
                 //search engine name
-                model.SeName = vendor.ValidateSeName(model.SeName, vendor.Name, true);
+                model.SeName = _urlRecordService.ValidateSeName(vendor, model.SeName, vendor.Name, true);
                 _urlRecordService.SaveSlug(vendor, model.SeName, 0);
 
                 //address
                 var address = _addressService.GetAddressById(vendor.AddressId);
                 if (address == null)
                 {
-                    address = model.Address.ToEntity();
+                    address = model.Address.ToEntity<Address>();
                     address.CreatedOnUtc = DateTime.UtcNow;
 
                     //some validation

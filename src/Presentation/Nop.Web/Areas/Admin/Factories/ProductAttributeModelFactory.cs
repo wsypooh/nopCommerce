@@ -3,7 +3,7 @@ using System.Linq;
 using Nop.Core.Domain.Catalog;
 using Nop.Services.Catalog;
 using Nop.Services.Localization;
-using Nop.Web.Areas.Admin.Extensions;
+using Nop.Web.Areas.Admin.Infrastructure.Mapper.Extensions;
 using Nop.Web.Areas.Admin.Models.Catalog;
 using Nop.Web.Framework.Extensions;
 using Nop.Web.Framework.Factories;
@@ -17,6 +17,7 @@ namespace Nop.Web.Areas.Admin.Factories
     {
         #region Fields
 
+        private readonly ILocalizationService _localizationService;
         private readonly ILocalizedModelFactory _localizedModelFactory;
         private readonly IProductAttributeService _productAttributeService;
         private readonly IProductService _productService;
@@ -25,10 +26,12 @@ namespace Nop.Web.Areas.Admin.Factories
 
         #region Ctor
 
-        public ProductAttributeModelFactory(ILocalizedModelFactory localizedModelFactory,
+        public ProductAttributeModelFactory(ILocalizationService localizationService,
+            ILocalizedModelFactory localizedModelFactory,
             IProductAttributeService productAttributeService,
             IProductService productService)
         {
+            this._localizationService = localizationService;
             this._localizedModelFactory = localizedModelFactory;
             this._productAttributeService = productAttributeService;
             this._productService = productService;
@@ -122,7 +125,7 @@ namespace Nop.Web.Areas.Admin.Factories
             var model = new ProductAttributeListModel
             {
                 //fill in model values from the entity
-                Data = productAttributes.Select(attribute => attribute.ToModel()),
+                Data = productAttributes.Select(attribute => attribute.ToModel<ProductAttributeModel>()),
                 Total = productAttributes.TotalCount
             };
 
@@ -144,7 +147,7 @@ namespace Nop.Web.Areas.Admin.Factories
             if (productAttribute != null)
             {
                 //fill in model values from the entity
-                model = model ?? productAttribute.ToModel();
+                model = model ?? productAttribute.ToModel<ProductAttributeModel>();
 
                 //prepare nested search models
                 PreparePredefinedProductAttributeValueSearchModel(model.PredefinedProductAttributeValueSearchModel, productAttribute);
@@ -153,8 +156,8 @@ namespace Nop.Web.Areas.Admin.Factories
                 //define localized model configuration action
                 localizedModelConfiguration = (locale, languageId) =>
                 {
-                    locale.Name = productAttribute.GetLocalized(entity => entity.Name, languageId, false, false);
-                    locale.Description = productAttribute.GetLocalized(entity => entity.Description, languageId, false, false);
+                    locale.Name = _localizationService.GetLocalized(productAttribute, entity => entity.Name, languageId, false, false);
+                    locale.Description = _localizationService.GetLocalized(productAttribute, entity => entity.Description, languageId, false, false);
                 };
             }
 
@@ -245,7 +248,7 @@ namespace Nop.Web.Areas.Admin.Factories
                 //define localized model configuration action
                 localizedModelConfiguration = (locale, languageId) =>
                 {
-                    locale.Name = productAttributeValue.GetLocalized(entity => entity.Name, languageId, false, false);
+                    locale.Name = _localizationService.GetLocalized(productAttributeValue, entity => entity.Name, languageId, false, false);
                 };
             }
 

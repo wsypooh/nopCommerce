@@ -157,6 +157,12 @@
         public static string ForumSettingsBottom => "admin_forum_settings_bottom";
         public static string ForumSettingsButtons => "admin_forum_settings_buttons";
         public static string ForumSettingsTop => "admin_forum_settings_top";
+        public static string GdprSettingsBottom => "admin_gdpr_settings_bottom";
+        public static string GdprSettingsButtons => "admin_gdpr_settings_buttons";
+        public static string GdprSettingsTop => "admin_gdpr_common_settings_top";
+        public static string GdprConsentDetailsBottom => "admin_gdpr_consent_details_bottom";
+        public static string GdprConsentDetailsButtons => "admin_gdpr_consent_details_buttons";
+        public static string GdprConsentDetailsTop => "admin_gdpr_consent_details_top";
         public static string GeneralCommonSettingsBottom => "admin_general_common_settings_bottom";
         public static string GeneralCommonSettingsButtons => "admin_general_common_settings_buttons";
         public static string GeneralCommonSettingsTop => "admin_general_common_settings_top";
@@ -217,8 +223,8 @@
         public static string OrderAddressDetailsBottom => "admin_order_address_details_bottom";
         public static string OrderAddressDetailsButtons => "admin_order_address_details_buttons";
         public static string OrderAddressDetailsTop => "admin_order_address_details_top";
-        public static string OrderDetailsBillingBottom => "admin_order_details_billing_bottom";
-        public static string OrderDetailsBillingTop => "admin_order_details_billing_top";
+        public static string OrderDetailsBillingShippingBottom => "admin_order_details_billing_shipping_bottom";
+        public static string OrderDetailsBillingShippingTop => "admin_order_details_billing_shipping_top";
         public static string OrderDetailsButtons => "admin_order_details_buttons";
         public static string OrderDetailsInfoBottom => "admin_order_details_info_bottom";
         public static string OrderDetailsInfoTop => "admin_order_details_info_top";
@@ -226,8 +232,6 @@
         public static string OrderDetailsNotesTop => "admin_order_details_notes_top";
         public static string OrderDetailsProductsBottom => "admin_order_details_products_bottom";
         public static string OrderDetailsProductsTop => "admin_order_details_products_top";
-        public static string OrderDetailsShippingBottom => "admin_order_details_shipping_bottom";
-        public static string OrderDetailsShippingTop => "admin_order_details_shipping_top";
         public static string OrderListButtons => "admin_order_list_buttons";
         public static string OrderPartiallyRefundButtons => "admin_order_partially_refund_buttons";
         public static string OrderSettingsButtons => "admin_order_settings_buttons";
@@ -310,6 +314,9 @@
         public static string ProductReviewDetailsButtons => "admin_product_review_details_buttons";
         public static string ProductReviewDetailsTop => "admin_product_review_details_top";
         public static string ProductReviewListButtons => "admin_product_review_list_buttons";
+        public static string ProductReviewTypeTop => "admin_product_review_type_top";
+        public static string ProductReviewTypeBottom => "admin_product_review_type_bottom";
+        public static string ProductReviewTypeButtons => "admin_product_review_type_buttons";
         public static string ProductTagDetailsBottom => "admin_product_tag_details_bottom";
         public static string ProductTagDetailsButtons => "admin_product_tag_details_buttons";
         public static string ProductTagDetailsTop => "admin_product_tag_details_top";

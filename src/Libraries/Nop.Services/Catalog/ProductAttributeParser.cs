@@ -5,6 +5,7 @@ using System.Linq;
 using System.Xml;
 using Nop.Core.Domain.Catalog;
 using Nop.Data;
+using Nop.Data.Extensions;
 
 namespace Nop.Services.Catalog
 {
@@ -22,11 +23,6 @@ namespace Nop.Services.Catalog
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="context">DB context</param>
-        /// <param name="productAttributeService">Product attribute service</param>
         public ProductAttributeParser(IDbContext context,
             IProductAttributeService productAttributeService)
         {
@@ -204,7 +200,7 @@ namespace Nop.Services.Catalog
                 {
                     if (node1.Attributes != null && node1.Attributes["ID"] != null)
                     {
-                        var str1 =node1.Attributes["ID"].InnerText.Trim();
+                        var str1 = node1.Attributes["ID"].InnerText.Trim();
                         if (int.TryParse(str1, out int id))
                         {
                             if (id == productAttributeMappingId)
@@ -259,7 +255,7 @@ namespace Nop.Services.Catalog
                 {
                     if (node1.Attributes != null && node1.Attributes["ID"] != null)
                     {
-                        var str1 =node1.Attributes["ID"].InnerText.Trim();
+                        var str1 = node1.Attributes["ID"].InnerText.Trim();
                         if (int.TryParse(str1, out int id))
                         {
                             if (id == productAttributeMapping.Id)
@@ -480,7 +476,7 @@ namespace Nop.Services.Catalog
 
             return allFound;
         }
-        
+
         /// <summary>
         /// Finds a product attribute combination by attributes stored in XML 
         /// </summary>
@@ -495,7 +491,7 @@ namespace Nop.Services.Catalog
                 throw new ArgumentNullException(nameof(product));
 
             var combinations = _productAttributeService.GetAllProductAttributeCombinations(product.Id);
-            return combinations.FirstOrDefault(x => 
+            return combinations.FirstOrDefault(x =>
                 AreProductAttributesEqual(x.AttributesXml, attributesXml, ignoreNonCombinableAttributes));
         }
 

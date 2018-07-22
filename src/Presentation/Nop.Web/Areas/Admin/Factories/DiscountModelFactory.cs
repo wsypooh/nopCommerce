@@ -14,7 +14,8 @@ using Nop.Services.Discounts;
 using Nop.Services.Helpers;
 using Nop.Services.Localization;
 using Nop.Services.Orders;
-using Nop.Web.Areas.Admin.Extensions;
+using Nop.Web.Areas.Admin.Infrastructure.Mapper.Extensions;
+using Nop.Web.Areas.Admin.Models.Catalog;
 using Nop.Web.Areas.Admin.Models.Discounts;
 using Nop.Web.Framework.Extensions;
 
@@ -39,7 +40,6 @@ namespace Nop.Web.Areas.Admin.Factories
         private readonly IPriceFormatter _priceFormatter;
         private readonly IProductService _productService;
         private readonly IWebHelper _webHelper;
-        private readonly IWorkContext _workContext;
 
         #endregion
 
@@ -56,8 +56,7 @@ namespace Nop.Web.Areas.Admin.Factories
             IOrderService orderService,
             IPriceFormatter priceFormatter,
             IProductService productService,
-            IWebHelper webHelper,
-            IWorkContext workContext)
+            IWebHelper webHelper)
         {
             this._currencySettings = currencySettings;
             this._baseAdminModelFactory = baseAdminModelFactory;
@@ -71,7 +70,6 @@ namespace Nop.Web.Areas.Admin.Factories
             this._priceFormatter = priceFormatter;
             this._productService = productService;
             this._webHelper = webHelper;
-            this._workContext = workContext;
         }
 
         #endregion
@@ -222,10 +220,10 @@ namespace Nop.Web.Areas.Admin.Factories
                 Data = discounts.PaginationByRequestModel(searchModel).Select(discount =>
                 {
                     //fill in model values from the entity
-                    var discountModel = discount.ToModel();
+                    var discountModel = discount.ToModel<DiscountModel>();
 
                     //fill in additional values (not existing in the entity)
-                    discountModel.DiscountTypeName = discount.DiscountType.GetLocalizedEnum(_localizationService, _workContext);
+                    discountModel.DiscountTypeName = _localizationService.GetLocalizedEnum(discount.DiscountType);
                     discountModel.PrimaryStoreCurrencyCode = _currencyService
                         .GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId)?.CurrencyCode;
                     discountModel.TimesUsed = _discountService.GetAllDiscountUsageHistory(discount.Id, pageSize: 1).TotalCount;
@@ -250,7 +248,7 @@ namespace Nop.Web.Areas.Admin.Factories
             if (discount != null)
             {
                 //fill in model values from the entity
-                model = model ?? discount.ToModel();
+                model = model ?? discount.ToModel<DiscountModel>();
 
                 //prepare available discount requirement rules
                 var discountRules = _discountService.LoadAllDiscountRequirementRules();
@@ -293,7 +291,7 @@ namespace Nop.Web.Areas.Admin.Factories
             if (model.RequiresCouponCode && !string.IsNullOrEmpty(model.CouponCode))
             {
                 model.DiscountUrl = QueryHelpers.AddQueryString(_webHelper.GetStoreLocation().TrimEnd('/'),
-                    NopServicesDefaults.DiscountCouponQueryParameter, model.CouponCode);
+                    NopDiscountDefaults.DiscountCouponQueryParameter, model.CouponCode);
             }
 
             //set default values for the new model
@@ -499,7 +497,7 @@ namespace Nop.Web.Areas.Admin.Factories
             var model = new AddProductToDiscountListModel
             {
                 //fill in model values from the entity
-                Data = products.Select(product => product.ToModel()),
+                Data = products.Select(product => product.ToModel<ProductModel>()),
                 Total = products.TotalCount
             };
 
@@ -532,7 +530,7 @@ namespace Nop.Web.Areas.Admin.Factories
                 Data = discountCategories.Select(category => new DiscountCategoryModel
                 {
                     CategoryId = category.Id,
-                    CategoryName = category.GetFormattedBreadCrumb(_categoryService)
+                    CategoryName = _categoryService.GetFormattedBreadCrumb(category)
                 }),
                 Total = discountCategories.TotalCount
             };
@@ -577,10 +575,10 @@ namespace Nop.Web.Areas.Admin.Factories
                 Data = categories.Select(category =>
                 {
                     //fill in model values from the entity
-                    var categoryModel = category.ToModel();
+                    var categoryModel = category.ToModel<CategoryModel>();
 
                     //fill in additional values (not existing in the entity)
-                    categoryModel.Breadcrumb = category.GetFormattedBreadCrumb(_categoryService);
+                    categoryModel.Breadcrumb = _categoryService.GetFormattedBreadCrumb(category);
 
                     return categoryModel;
                 }),
@@ -660,7 +658,7 @@ namespace Nop.Web.Areas.Admin.Factories
             var model = new AddManufacturerToDiscountListModel
             {
                 //fill in model values from the entity
-                Data = manufacturers.Select(manufacturer => manufacturer.ToModel()),
+                Data = manufacturers.Select(manufacturer => manufacturer.ToModel<ManufacturerModel>()),
                 Total = manufacturers.TotalCount
             };
 

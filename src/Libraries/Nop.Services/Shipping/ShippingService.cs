@@ -25,93 +25,62 @@ namespace Nop.Services.Shipping
     /// </summary>
     public partial class ShippingService : IShippingService
     {
-        #region Constants
-
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : warehouse ID
-        /// </remarks>
-        private const string WAREHOUSES_BY_ID_KEY = "Nop.warehouse.id-{0}";
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string WAREHOUSES_PATTERN_KEY = "Nop.warehouse.";
-
-        #endregion
-
         #region Fields
 
-        private readonly IRepository<ShippingMethod> _shippingMethodRepository;
-        private readonly IRepository<Warehouse> _warehouseRepository;
-        private readonly ILogger _logger;
-        private readonly IProductService _productService;
-        private readonly IProductAttributeParser _productAttributeParser;
+        private readonly IAddressService _addressService;
+        private readonly ICacheManager _cacheManager;
         private readonly ICheckoutAttributeParser _checkoutAttributeParser;
+        private readonly IEventPublisher _eventPublisher;
         private readonly IGenericAttributeService _genericAttributeService;
         private readonly ILocalizationService _localizationService;
-        private readonly IAddressService _addressService;
-        private readonly ShippingSettings _shippingSettings;
+        private readonly ILogger _logger;
         private readonly IPluginFinder _pluginFinder;
+        private readonly IPriceCalculationService _priceCalculationService;
+        private readonly IProductAttributeParser _productAttributeParser;
+        private readonly IProductService _productService;
+        private readonly IRepository<ShippingMethod> _shippingMethodRepository;
+        private readonly IRepository<Warehouse> _warehouseRepository;
         private readonly IStoreContext _storeContext;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly ShippingSettings _shippingSettings;
         private readonly ShoppingCartSettings _shoppingCartSettings;
-        private readonly ICacheManager _cacheManager;
 
         #endregion
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="shippingMethodRepository">Shipping method repository</param>
-        /// <param name="warehouseRepository">Warehouse repository</param>
-        /// <param name="logger">Logger</param>
-        /// <param name="productService">Product service</param>
-        /// <param name="productAttributeParser">Product attribute parser</param>
-        /// <param name="checkoutAttributeParser">Checkout attribute parser</param>
-        /// <param name="genericAttributeService">Generic attribute service</param>
-        /// <param name="localizationService">Localization service</param>
-        /// <param name="addressService">Address service</param>
-        /// <param name="shippingSettings">Shipping settings</param>
-        /// <param name="pluginFinder">Plugin finder</param>
-        /// <param name="storeContext">Store context</param>
-        /// <param name="eventPublisher">Event published</param>
-        /// <param name="shoppingCartSettings">Shopping cart settings</param>
-        /// <param name="cacheManager">Cache manager</param>
-        public ShippingService(IRepository<ShippingMethod> shippingMethodRepository,
-            IRepository<Warehouse> warehouseRepository,
-            ILogger logger,
-            IProductService productService,
-            IProductAttributeParser productAttributeParser,
+        public ShippingService(IAddressService addressService,
+            ICacheManager cacheManager,
             ICheckoutAttributeParser checkoutAttributeParser,
+            IEventPublisher eventPublisher,
             IGenericAttributeService genericAttributeService,
             ILocalizationService localizationService,
-            IAddressService addressService,
-            ShippingSettings shippingSettings,
+            ILogger logger,
             IPluginFinder pluginFinder,
+            IPriceCalculationService priceCalculationService,
+            IProductAttributeParser productAttributeParser,
+            IProductService productService,
+            IRepository<ShippingMethod> shippingMethodRepository,
+            IRepository<Warehouse> warehouseRepository,
             IStoreContext storeContext,
-            IEventPublisher eventPublisher,
-            ShoppingCartSettings shoppingCartSettings,
-            ICacheManager cacheManager)
+            ShippingSettings shippingSettings,
+            ShoppingCartSettings shoppingCartSettings)
         {
-            this._shippingMethodRepository = shippingMethodRepository;
-            this._warehouseRepository = warehouseRepository;
-            this._logger = logger;
-            this._productService = productService;
-            this._productAttributeParser = productAttributeParser;
+            this._addressService = addressService;
+            this._cacheManager = cacheManager;
             this._checkoutAttributeParser = checkoutAttributeParser;
+            this._eventPublisher = eventPublisher;
             this._genericAttributeService = genericAttributeService;
             this._localizationService = localizationService;
-            this._addressService = addressService;
-            this._shippingSettings = shippingSettings;
+            this._logger = logger;
             this._pluginFinder = pluginFinder;
+            this._priceCalculationService = priceCalculationService;
+            this._productAttributeParser = productAttributeParser;
+            this._productService = productService;
+            this._shippingMethodRepository = shippingMethodRepository;
             this._storeContext = storeContext;
-            this._eventPublisher = eventPublisher;
+            this._warehouseRepository = warehouseRepository;
+            this._shippingSettings = shippingSettings;
             this._shoppingCartSettings = shoppingCartSettings;
-            this._cacheManager = cacheManager;
         }
 
         #endregion
@@ -198,6 +167,26 @@ namespace Nop.Services.Shipping
             return _pluginFinder.GetPlugins<IShippingRateComputationMethod>(customer: customer, storeId: storeId).ToList();
         }
 
+        /// <summary>
+        /// Is shipping rate computation method active
+        /// </summary>
+        /// <param name="srcm">Shipping rate computation method</param>
+        /// <returns>Result</returns>
+        public virtual bool IsShippingRateComputationMethodActive(IShippingRateComputationMethod srcm)
+        {
+            if (srcm == null)
+                throw new ArgumentNullException(nameof(srcm));
+
+            if (_shippingSettings.ActiveShippingRateComputationMethodSystemNames == null)
+                return false;
+
+            foreach (var activeMethodSystemName in _shippingSettings.ActiveShippingRateComputationMethodSystemNames)
+                if (srcm.PluginDescriptor.SystemName.Equals(activeMethodSystemName, StringComparison.InvariantCultureIgnoreCase))
+                    return true;
+
+            return false;
+        }
+
         #endregion
 
         #region Shipping methods
@@ -212,6 +201,8 @@ namespace Nop.Services.Shipping
                 throw new ArgumentNullException(nameof(shippingMethod));
 
             _shippingMethodRepository.Delete(shippingMethod);
+
+            _cacheManager.RemoveByPattern(NopShippingDefaults.ShippingMethodsPatternCacheKey);
 
             //event notification
             _eventPublisher.EntityDeleted(shippingMethod);
@@ -237,29 +228,31 @@ namespace Nop.Services.Shipping
         /// <returns>Shipping methods</returns>
         public virtual IList<ShippingMethod> GetAllShippingMethods(int? filterByCountryId = null)
         {
-            if (filterByCountryId.HasValue && filterByCountryId.Value > 0)
-            {
-                var query1 = from sm in _shippingMethodRepository.Table
-                             where
-                             sm.RestrictedCountries.Select(c => c.Id).Contains(filterByCountryId.Value)
-                             select sm.Id;
+            var key = string.Format(NopShippingDefaults.ShippingMethodsAllCacheKey, filterByCountryId.HasValue ? filterByCountryId.Value : 0);
 
-                var query2 = from sm in _shippingMethodRepository.Table
-                             where !query1.Contains(sm.Id)
-                             orderby sm.DisplayOrder, sm.Id
-                             select sm;
-
-                var shippingMethods = query2.ToList();
-                return shippingMethods;
-            }
-            else
+            return _cacheManager.Get(key, () =>
             {
-                var query = from sm in _shippingMethodRepository.Table
-                            orderby sm.DisplayOrder, sm.Id
-                            select sm;
-                var shippingMethods = query.ToList();
-                return shippingMethods;
-            }
+                if (filterByCountryId.HasValue && filterByCountryId.Value > 0)
+                {
+                    var query1 = from sm in _shippingMethodRepository.Table
+                                 where sm.ShippingMethodCountryMappings.Select(mapping => mapping.CountryId).Contains(filterByCountryId.Value)
+                                 select sm.Id;
+
+                    var query2 = from sm in _shippingMethodRepository.Table
+                                 where !query1.Contains(sm.Id)
+                                 orderby sm.DisplayOrder, sm.Id
+                                 select sm;
+
+                    return query2.ToList();
+                }
+                else
+                {
+                    var query = from sm in _shippingMethodRepository.Table
+                                orderby sm.DisplayOrder, sm.Id
+                                select sm;
+                    return query.ToList();
+                }
+            });
         }
 
         /// <summary>
@@ -272,6 +265,8 @@ namespace Nop.Services.Shipping
                 throw new ArgumentNullException(nameof(shippingMethod));
 
             _shippingMethodRepository.Insert(shippingMethod);
+
+            _cacheManager.RemoveByPattern(NopShippingDefaults.ShippingMethodsPatternCacheKey);
 
             //event notification
             _eventPublisher.EntityInserted(shippingMethod);
@@ -288,8 +283,25 @@ namespace Nop.Services.Shipping
 
             _shippingMethodRepository.Update(shippingMethod);
 
+            _cacheManager.RemoveByPattern(NopShippingDefaults.ShippingMethodsPatternCacheKey);
+
             //event notification
             _eventPublisher.EntityUpdated(shippingMethod);
+        }
+
+        /// <summary>
+        /// Does country restriction exist
+        /// </summary>
+        /// <param name="shippingMethod">Shipping method</param>
+        /// <param name="countryId">Country identifier</param>
+        /// <returns>Result</returns>
+        public virtual bool CountryRestrictionExists(ShippingMethod shippingMethod, int countryId)
+        {
+            if (shippingMethod == null)
+                throw new ArgumentNullException(nameof(shippingMethod));
+
+            var result = shippingMethod.ShippingMethodCountryMappings.Any(c => c.CountryId == countryId);
+            return result;
         }
 
         #endregion
@@ -308,7 +320,7 @@ namespace Nop.Services.Shipping
             _warehouseRepository.Delete(warehouse);
 
             //clear cache
-            _cacheManager.RemoveByPattern(WAREHOUSES_PATTERN_KEY);
+            _cacheManager.RemoveByPattern(NopShippingDefaults.WarehousesPatternCacheKey);
 
             //event notification
             _eventPublisher.EntityDeleted(warehouse);
@@ -324,7 +336,7 @@ namespace Nop.Services.Shipping
             if (warehouseId == 0)
                 return null;
 
-            var key = string.Format(WAREHOUSES_BY_ID_KEY, warehouseId);
+            var key = string.Format(NopShippingDefaults.WarehousesByIdCacheKey, warehouseId);
             return _cacheManager.Get(key, () => _warehouseRepository.GetById(warehouseId));
         }
 
@@ -353,7 +365,7 @@ namespace Nop.Services.Shipping
             _warehouseRepository.Insert(warehouse);
 
             //clear cache
-            _cacheManager.RemoveByPattern(WAREHOUSES_PATTERN_KEY);
+            _cacheManager.RemoveByPattern(NopShippingDefaults.WarehousesPatternCacheKey);
 
             //event notification
             _eventPublisher.EntityInserted(warehouse);
@@ -371,7 +383,7 @@ namespace Nop.Services.Shipping
             _warehouseRepository.Update(warehouse);
 
             //clear cache
-            _cacheManager.RemoveByPattern(WAREHOUSES_PATTERN_KEY);
+            _cacheManager.RemoveByPattern(NopShippingDefaults.WarehousesPatternCacheKey);
 
             //event notification
             _eventPublisher.EntityUpdated(warehouse);
@@ -416,6 +428,27 @@ namespace Nop.Services.Shipping
         public virtual IList<IPickupPointProvider> LoadAllPickupPointProviders(Customer customer = null, int storeId = 0)
         {
             return _pluginFinder.GetPlugins<IPickupPointProvider>(customer: customer, storeId: storeId).ToList();
+        }
+
+        /// <summary>
+        /// Is pickup point provider active
+        /// </summary>
+        /// <param name="pickupPointProvider">Pickup point provider</param>
+        /// <returns>Result</returns>
+        public virtual bool IsPickupPointProviderActive(IPickupPointProvider pickupPointProvider)
+        {
+            if (pickupPointProvider == null)
+                throw new ArgumentNullException(nameof(pickupPointProvider));
+
+            if (_shippingSettings.ActivePickupPointProviderSystemNames == null)
+                return false;
+
+            foreach (var activeProviderSystemName in _shippingSettings.ActivePickupPointProviderSystemNames)
+                if (pickupPointProvider.PluginDescriptor.SystemName.Equals(activeProviderSystemName, StringComparison.InvariantCultureIgnoreCase))
+                    return true;
+
+            return false;
+
         }
 
         #endregion
@@ -485,12 +518,12 @@ namespace Nop.Services.Shipping
         /// <param name="includeCheckoutAttributes">A value indicating whether we should calculate weights of selected checkotu attributes</param>
         /// <param name="ignoreFreeShippedItems">Whether to ignore the weight of the products marked as "Free shipping"</param>
         /// <returns>Total weight</returns>
-        public virtual decimal GetTotalWeight(GetShippingOptionRequest request, 
+        public virtual decimal GetTotalWeight(GetShippingOptionRequest request,
             bool includeCheckoutAttributes = true, bool ignoreFreeShippedItems = false)
         {
             if (request == null)
                 throw new ArgumentNullException(nameof(request));
-            
+
             var totalWeight = decimal.Zero;
 
             //shopping cart items
@@ -500,7 +533,7 @@ namespace Nop.Services.Shipping
             //checkout attributes
             if (request.Customer != null && includeCheckoutAttributes)
             {
-                var checkoutAttributesXml = request.Customer.GetAttribute<string>(SystemCustomerAttributeNames.CheckoutAttributes, _genericAttributeService, _storeContext.CurrentStore.Id);
+                var checkoutAttributesXml = _genericAttributeService.GetAttribute<string>(request.Customer, NopCustomerDefaults.CheckoutAttributes, _storeContext.CurrentStore.Id);
                 if (!string.IsNullOrEmpty(checkoutAttributesXml))
                 {
                     var attributeValues = _checkoutAttributeParser.ParseCheckoutAttributeValues(checkoutAttributesXml);
@@ -716,7 +749,7 @@ namespace Nop.Services.Shipping
 
             foreach (var sci in cart)
             {
-                if (!sci.IsShipEnabled(_productService, _productAttributeParser))
+                if (!this.IsShipEnabled(sci))
                     continue;
 
                 var product = sci.Product;
@@ -772,7 +805,7 @@ namespace Nop.Services.Shipping
                         StoreId = storeId
                     };
                     //customer
-                    request.Customer = cart.GetCustomer();
+                    request.Customer = cart.FirstOrDefault(item => item.Customer != null)?.Customer;
                     //ship to
                     request.ShippingAddress = shippingAddress;
                     //ship from
@@ -851,7 +884,7 @@ namespace Nop.Services.Shipping
         /// <param name="storeId">Load records allowed only in a specified store; pass 0 to load all records</param>
         /// <returns>Shipping options</returns>
         public virtual GetShippingOptionResponse GetShippingOptions(IList<ShoppingCartItem> cart,
-            Address shippingAddress, Customer customer = null, string allowedShippingRateComputationMethodSystemName = "", 
+            Address shippingAddress, Customer customer = null, string allowedShippingRateComputationMethodSystemName = "",
             int storeId = 0)
         {
             if (cart == null)
@@ -934,7 +967,7 @@ namespace Nop.Services.Shipping
                         if (string.IsNullOrEmpty(so.ShippingRateComputationMethodSystemName))
                             so.ShippingRateComputationMethodSystemName = srcm.PluginDescriptor.SystemName;
                         if (_shoppingCartSettings.RoundPricesDuringCalculation)
-                            so.Rate = RoundingHelper.RoundPrice(so.Rate);
+                            so.Rate = _priceCalculationService.RoundPrice(so.Rate);
                         result.ShippingOptions.Add(so);
                     }
                 }
@@ -946,11 +979,11 @@ namespace Nop.Services.Shipping
                 if (result.ShippingOptions.Any() && result.Errors.Any())
                     result.Errors.Clear();
             }
-            
+
             //no shipping options loaded
             if (!result.ShippingOptions.Any() && !result.Errors.Any())
                 result.Errors.Add(_localizationService.GetResource("Checkout.ShippingOptionCouldNotBeLoaded"));
-            
+
             return result;
         }
 
@@ -1000,6 +1033,75 @@ namespace Nop.Services.Shipping
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Whether the shopping cart item is ship enabled
+        /// </summary>
+        /// <param name="shoppingCartItem">Shopping cart item</param>
+        /// <returns>True if the shopping cart item requires shipping; otherwise false</returns>
+        public virtual bool IsShipEnabled(ShoppingCartItem shoppingCartItem)
+        {
+            //whether the product requires shipping
+            if (shoppingCartItem.Product != null && shoppingCartItem.Product.IsShipEnabled)
+                return true;
+
+            if (string.IsNullOrEmpty(shoppingCartItem.AttributesXml))
+                return false;
+
+            //or whether associated products of the shopping cart item require shipping
+            return _productAttributeParser.ParseProductAttributeValues(shoppingCartItem.AttributesXml)
+                .Where(attributeValue => attributeValue.AttributeValueType == AttributeValueType.AssociatedToProduct)
+                .Any(attributeValue => _productService.GetProductById(attributeValue.AssociatedProductId)?.IsShipEnabled ?? false);
+        }
+
+        /// <summary>
+        /// Whether the shopping cart item is free shipping
+        /// </summary>
+        /// <param name="shoppingCartItem">Shopping cart item</param>
+        /// <returns>True if the shopping cart item is free shipping; otherwise false</returns>
+        public virtual bool IsFreeShipping(ShoppingCartItem shoppingCartItem)
+        {
+            //first, check whether shipping is required
+            if (!this.IsShipEnabled(shoppingCartItem))
+                return true;
+
+            //then whether the product is free shipping
+            if (shoppingCartItem.Product != null && !shoppingCartItem.Product.IsFreeShipping)
+                return false;
+
+            if (string.IsNullOrEmpty(shoppingCartItem.AttributesXml))
+                return true;
+
+            //and whether associated products of the shopping cart item is free shipping
+            return _productAttributeParser.ParseProductAttributeValues(shoppingCartItem.AttributesXml)
+                .Where(attributeValue => attributeValue.AttributeValueType == AttributeValueType.AssociatedToProduct)
+                .All(attributeValue => _productService.GetProductById(attributeValue.AssociatedProductId)?.IsFreeShipping ?? true);
+        }
+
+        /// <summary>
+        /// Get the additional shipping charge
+        /// </summary> 
+        /// <param name="shoppingCartItem">Shopping cart item</param>
+        /// <returns>The additional shipping charge of the shopping cart item</returns>
+        public virtual decimal GetAdditionalShippingCharge(ShoppingCartItem shoppingCartItem)
+        {
+            //first, check whether shipping is free
+            if (this.IsFreeShipping(shoppingCartItem))
+                return decimal.Zero;
+
+            //get additional shipping charge of the product
+            var additionalShippingCharge = (shoppingCartItem.Product?.AdditionalShippingCharge ?? decimal.Zero) * shoppingCartItem.Quantity;
+
+            if (string.IsNullOrEmpty(shoppingCartItem.AttributesXml))
+                return additionalShippingCharge;
+
+            //and sum with associated products additional shipping charges
+            additionalShippingCharge += _productAttributeParser.ParseProductAttributeValues(shoppingCartItem.AttributesXml)
+                .Where(attributeValue => attributeValue.AttributeValueType == AttributeValueType.AssociatedToProduct)
+                .Sum(attributeValue => _productService.GetProductById(attributeValue.AssociatedProductId)?.AdditionalShippingCharge ?? decimal.Zero);
+
+            return additionalShippingCharge;
         }
 
         #endregion

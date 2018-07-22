@@ -16,8 +16,8 @@ using Nop.Services.Media;
 using Nop.Services.Security;
 using Nop.Services.Seo;
 using Nop.Services.Stores;
-using Nop.Web.Areas.Admin.Extensions;
 using Nop.Web.Areas.Admin.Factories;
+using Nop.Web.Areas.Admin.Infrastructure.Mapper.Extensions;
 using Nop.Web.Areas.Admin.Models.Catalog;
 using Nop.Web.Framework.Controllers;
 using Nop.Web.Framework.Mvc;
@@ -122,7 +122,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                     localized.LanguageId);
 
                 //search engine name
-                var seName = category.ValidateSeName(localized.SeName, localized.Name, false);
+                var seName = _urlRecordService.ValidateSeName(category, localized.SeName, localized.Name, false);
                 _urlRecordService.SaveSlug(category, seName, localized.LanguageId);
             }
         }
@@ -237,13 +237,13 @@ namespace Nop.Web.Areas.Admin.Controllers
 
             if (ModelState.IsValid)
             {
-                var category = model.ToEntity();
+                var category = model.ToEntity<Category>();
                 category.CreatedOnUtc = DateTime.UtcNow;
                 category.UpdatedOnUtc = DateTime.UtcNow;
                 _categoryService.InsertCategory(category);
 
                 //search engine name
-                model.SeName = category.ValidateSeName(model.SeName, category.Name, true);
+                model.SeName = _urlRecordService.ValidateSeName(category, model.SeName, category.Name, true);
                 _urlRecordService.SaveSlug(category, model.SeName, 0);
 
                 //locales
@@ -254,7 +254,8 @@ namespace Nop.Web.Areas.Admin.Controllers
                 foreach (var discount in allDiscounts)
                 {
                     if (model.SelectedDiscountIds != null && model.SelectedDiscountIds.Contains(discount.Id))
-                        category.AppliedDiscounts.Add(discount);
+                        //category.AppliedDiscounts.Add(discount);
+                        category.DiscountCategoryMappings.Add(new DiscountCategoryMapping { Discount = discount });
                 }
 
                 _categoryService.UpdateCategory(category);
@@ -326,7 +327,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                 _categoryService.UpdateCategory(category);
 
                 //search engine name
-                model.SeName = category.ValidateSeName(model.SeName, category.Name, true);
+                model.SeName = _urlRecordService.ValidateSeName(category, model.SeName, category.Name, true);
                 _urlRecordService.SaveSlug(category, model.SeName, 0);
 
                 //locales
@@ -339,14 +340,15 @@ namespace Nop.Web.Areas.Admin.Controllers
                     if (model.SelectedDiscountIds != null && model.SelectedDiscountIds.Contains(discount.Id))
                     {
                         //new discount
-                        if (category.AppliedDiscounts.Count(d => d.Id == discount.Id) == 0)
-                            category.AppliedDiscounts.Add(discount);
+                        if (category.DiscountCategoryMappings.Count(mapping => mapping.DiscountId == discount.Id) == 0)
+                            category.DiscountCategoryMappings.Add(new DiscountCategoryMapping { Discount = discount });
                     }
                     else
                     {
                         //remove discount
-                        if (category.AppliedDiscounts.Count(d => d.Id == discount.Id) > 0)
-                            category.AppliedDiscounts.Remove(discount);
+                        if (category.DiscountCategoryMappings.Count(mapping => mapping.DiscountId == discount.Id) > 0)
+                            category.DiscountCategoryMappings
+                                .Remove(category.DiscountCategoryMappings.FirstOrDefault(mapping => mapping.DiscountId == discount.Id));
                     }
                 }
 
@@ -575,7 +577,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                 foreach (var product in selectedProducts)
                 {
                     //whether product category with such parameters already exists
-                    if (existingProductCategories.FindProductCategory(product.Id, model.CategoryId) != null)
+                    if (_categoryService.FindProductCategory(existingProductCategories, product.Id, model.CategoryId) != null)
                         continue;
 
                     //insert the new product category mapping
@@ -590,7 +592,7 @@ namespace Nop.Web.Areas.Admin.Controllers
             }
 
             ViewBag.RefreshPage = true;
-            
+
             return View(new AddProductToCategorySearchModel());
         }
 
